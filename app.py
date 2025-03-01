@@ -3,7 +3,6 @@ import pandas as pd
 import plotly.express as px
 import os
 from dotenv import load_dotenv
-import json
 import time
 import anthropic
 
@@ -73,14 +72,14 @@ st.markdown(f"""
         font-size: 16px;
         font-weight: 600;
         color: #333;
-        margin-left: 10px;
+        margin-right: 10px;
     }}
     
     .chat-description {{
         margin: 0;
         font-size: 12px;
         color: #666;
-        margin-left: 10px;
+        margin-right: 10px;
     }}
     
     /* Messages area */
@@ -99,7 +98,7 @@ st.markdown(f"""
     }}
     
     .user-message {{
-        float: right;
+        float: left;
         background-color: #E8F5FE;
         color: #333;
         border-radius: 18px 4px 18px 18px;
@@ -107,7 +106,7 @@ st.markdown(f"""
     }}
     
     .assistant-message {{
-        float: left;
+        float: right;
         background-color: white;
         color: #333;
         border-radius: 4px 18px 18px 18px;
@@ -120,6 +119,7 @@ st.markdown(f"""
         display: flex;
         gap: 8px;
         margin-top: 8px;
+        justify-content: flex-end;
     }}
     
     .action-button {{
@@ -148,17 +148,17 @@ st.markdown(f"""
     
     .alert.warning {{
         background-color: #FFF8E1;
-        border-left: 3px solid {warning_color};
+        border-right: 3px solid {warning_color};
     }}
     
     .alert.error {{
         background-color: #FFEBEE;
-        border-left: 3px solid {error_color};
+        border-right: 3px solid {error_color};
     }}
     
     .alert.info {{
         background-color: #E3F2FD;
-        border-left: 3px solid {primary_color};
+        border-right: 3px solid {primary_color};
     }}
     
     /* Input area */
@@ -177,6 +177,7 @@ st.markdown(f"""
         gap: 8px;
         margin-bottom: 12px;
         padding: 0 16px;
+        justify-content: flex-end;
     }}
     
     .suggestion-chip {{
@@ -200,6 +201,8 @@ st.markdown(f"""
         border-radius: 20px !important;
         border: 1px solid #E0E0E0 !important;
         padding: 8px 16px !important;
+        text-align: right !important;
+        direction: rtl !important;
     }}
     
     .stTextInput > div > div > input:focus {{
@@ -592,7 +595,7 @@ def main():
         st.error(error)
         return
     
-    # File uploader in sidebar (optional)
+    # File uploader in sidebar (optional, hidden by default)
     with st.sidebar:
         st.title("העלאת קובץ")
         uploaded_file = st.file_uploader("העלה קובץ אקסל להחלפת נתוני ברירת המחדל", type=["xlsx", "xls"])
@@ -640,7 +643,7 @@ def main():
     # Display chat messages
     for msg in st.session_state.messages:
         if msg["role"] == "user":
-            # User message
+            # User message - display on the right
             st.markdown(f"""
             <div class="clearfix">
                 <div class="message user-message rtl">
@@ -649,29 +652,35 @@ def main():
             </div>
             """, unsafe_allow_html=True)
         else:
-            # Assistant message
+            # Assistant message - display on the left
             content = msg["content"]
             
             # For backward compatibility
             if isinstance(content, str):
                 content = {"text": content, "actions": [], "alert": None}
             
+            # Construct action buttons HTML if they exist
+            action_buttons_html = ""
+            if content.get("actions"):
+                action_buttons_html = '<div class="action-buttons">'
+                for action in content["actions"]:
+                    action_buttons_html += f'<button class="action-button">{action}</button>'
+                action_buttons_html += '</div>'
+            
+            # Construct alert HTML if it exists
+            alert_html = ""
+            if content.get("alert"):
+                alert_type = content["alert"]["type"]
+                alert_message = content["alert"]["message"]
+                alert_html = f'<div class="alert {alert_type}">{alert_message}</div>'
+            
+            # Render the message with its components
             st.markdown(f"""
             <div class="clearfix">
                 <div class="message assistant-message rtl">
                     {content["text"]}
-                    
-                    {f'''
-                    <div class="action-buttons">
-                        {"".join([f'<button class="action-button">{action}</button>' for action in content["actions"]])}
-                    </div>
-                    ''' if content.get("actions") else ''}
-                    
-                    {f'''
-                    <div class="alert {content["alert"]["type"]}">
-                        {content["alert"]["message"]}
-                    </div>
-                    ''' if content.get("alert") else ''}
+                    {action_buttons_html}
+                    {alert_html}
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -696,7 +705,7 @@ def main():
     col1, col2 = st.columns([6, 1])
     
     with col1:
-        user_input = st.text_input("", placeholder="הקלד שאלה על נתוני החזרות...", label_visibility="collapsed")
+        user_input = st.text_input("", placeholder="הקלד שאלה על נתוני החזרות...", label_visibility="collapsed", key="chat_input")
     
     with col2:
         send_pressed = st.button("↑", help="שלח")
@@ -722,6 +731,11 @@ def main():
         
         # Set thinking state
         st.session_state.thinking = True
+        
+        # Reset the input field
+        st.session_state.chat_input = ""
+        
+        # Rerun to update UI
         st.experimental_rerun()
 
 # Process message when in thinking state
