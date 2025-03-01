@@ -5,193 +5,206 @@ import os
 from dotenv import load_dotenv
 import json
 import time
-import anthropic  # Add anthropic import for Claude API
+import anthropic
 
 # טען מפתח API מהגדרות הסביבה או מקובץ .env
-load_dotenv()  # טען משתני סביבה מקובץ .env אם קיים
+load_dotenv()
 
-# מפתח ה-API של Claude יהיה זמין באחת מהדרכים הבאות (לפי סדר עדיפות):
-# 1. מ-secrets של Streamlit (מועדף לפריסה)
-# 2. ממשתנה סביבה
-# 3. מקובץ .env
+# מפתח ה-API של Claude
 CLAUDE_API_KEY = st.secrets.get("CLAUDE_API_KEY", os.getenv("CLAUDE_API_KEY", ""))
 
 # Set page configuration
 st.set_page_config(
-    page_title="Contamio - Food Recall Chatbot",
+    page_title="Contamio",
     page_icon="🔍",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# Custom theme colors and styling - Contamio style
+# Minimal color palette
 primary_color = "#1E88E5"  # Contamio blue
-secondary_color = "#64B5F6"  # Light blue
-background_color = "#F5F9FF"  # Light blue background
-chat_bg_color = "#FFFFFF"  # Chat bubble background
-text_color = "#212121"
+light_bg = "#FAFAFA"       # Very light gray, almost white
+error_color = "#FF5252"    # Soft red for warnings
+warning_color = "#FFD740"  # Soft yellow for caution
+success_color = "#4CAF50"  # Soft green for success
 
-# Custom CSS for Contamio-like UI
+# Custom CSS for minimal design
 st.markdown(f"""
 <style>
-    /* Page background */
+    /* Reset some of Streamlit's default styling */
     .stApp {{
-        background-color: {background_color};
-        background-image: url("data:image/svg+xml,%3Csvg width='64' height='64' viewBox='0 0 64 64' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M8 16c4.418 0 8-3.582 8-8s-3.582-8-8-8-8 3.582-8 8 3.582 8 8 8zm0-2c3.314 0 6-2.686 6-6s-2.686-6-6-6-6 2.686-6 6 2.686 6 6 6zm33.414-6l5.95-5.95L45.95.636 40 6.586 34.05.636 32.636 2.05 38.586 8l-5.95 5.95 1.414 1.414L40 9.414l5.95 5.95 1.414-1.414L41.414 8zM40 48c4.418 0 8-3.582 8-8s-3.582-8-8-8-8 3.582-8 8 3.582 8 8 8zm0-2c3.314 0 6-2.686 6-6s-2.686-6-6-6-6 2.686-6 6 2.686 6 6 6zM9.414 40l5.95-5.95-1.414-1.414L8 38.586l-5.95-5.95L.636 34.05 6.586 40l-5.95 5.95 1.414 1.414L8 41.414l5.95 5.95 1.414-1.414L9.414 40z' fill='%231E88E5' fill-opacity='0.08' fill-rule='evenodd'/%3E%3C/svg%3E");
+        background-color: #FFFFFF;
     }}
     
-    /* Hide fullscreen button */
-    .fullScreenFrame > div > button {{
-        display: none;
-    }}
-    
-    /* Main container styling */
     .main .block-container {{
-        max-width: 800px;
-        padding-top: 2rem;
+        padding-top: 1rem;
         padding-bottom: 1rem;
-        margin: 0 auto;
+        max-width: 900px;
     }}
     
-    /* Chat container */
+    /* Hide Streamlit branding */
+    #MainMenu, footer, header {{
+        visibility: hidden;
+    }}
+    
+    /* Chatbox container */
     .chat-container {{
-        background-color: {chat_bg_color};
-        border-radius: 10px;
-        padding: 10px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        height: 70vh;
+        border: 1px solid #EEEEEE;
+        border-radius: 12px;
+        background-color: #FFFFFF;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        overflow: hidden;
         display: flex;
         flex-direction: column;
-        overflow: hidden;
+        height: 75vh;
     }}
     
     /* Chat header */
     .chat-header {{
+        padding: 12px 16px;
+        background-color: white;
+        border-bottom: 1px solid #EEEEEE;
         display: flex;
         align-items: center;
-        padding: 10px 15px;
-        background-color: {primary_color};
-        color: white;
-        border-radius: 8px 8px 0 0;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
     }}
     
-    .chat-header-info {{
-        margin-left: 15px;
-    }}
-    
-    .chat-header-info h3 {{
+    .chat-title {{
         margin: 0;
-        font-size: 1.2rem;
+        font-size: 16px;
+        font-weight: 600;
+        color: #333;
+        margin-left: 10px;
     }}
     
-    .chat-header-info p {{
+    .chat-description {{
         margin: 0;
-        font-size: 0.8rem;
-        opacity: 0.8;
+        font-size: 12px;
+        color: #666;
+        margin-left: 10px;
     }}
     
-    /* Messages container */
-    .messages-container {{
+    /* Messages area */
+    .messages-area {{
         flex: 1;
         overflow-y: auto;
-        padding: 15px;
-        background-image: url("data:image/svg+xml,%3Csvg width='64' height='64' viewBox='0 0 64 64' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M8 16c4.418 0 8-3.582 8-8s-3.582-8-8-8-8 3.582-8 8 3.582 8 8 8zm0-2c3.314 0 6-2.686 6-6s-2.686-6-6-6-6 2.686-6 6 2.686 6 6 6zm33.414-6l5.95-5.95L45.95.636 40 6.586 34.05.636 32.636 2.05 38.586 8l-5.95 5.95 1.414 1.414L40 9.414l5.95 5.95 1.414-1.414L41.414 8zM40 48c4.418 0 8-3.582 8-8s-3.582-8-8-8-8 3.582-8 8 3.582 8 8 8zm0-2c3.314 0 6-2.686 6-6s-2.686-6-6-6-6 2.686-6 6 2.686 6 6 6zM9.414 40l5.95-5.95-1.414-1.414L8 38.586l-5.95-5.95L.636 34.05 6.586 40l-5.95 5.95 1.414 1.414L8 41.414l5.95 5.95 1.414-1.414L9.414 40z' fill='%231E88E5' fill-opacity='0.04' fill-rule='evenodd'/%3E%3C/svg%3E");
+        padding: 16px;
+        background-color: {light_bg};
     }}
     
     /* Message bubbles */
     .message {{
-        max-width: 75%;
-        padding: 10px 15px;
-        margin-bottom: 10px;
-        border-radius: 10px;
-        position: relative;
-        font-size: 0.95rem;
-        line-height: 1.4;
-        word-wrap: break-word;
-        animation: fadeIn 0.3s ease;
+        margin-bottom: 12px;
+        max-width: 80%;
+        clear: both;
     }}
     
-    .message.user {{
-        background-color: #E3F2FD;  /* Lighter Contamio blue */
-        margin-left: auto;
-        margin-right: 15px;
-        border-radius: 10px 0 10px 10px;
+    .user-message {{
+        float: right;
+        background-color: #E8F5FE;
+        color: #333;
+        border-radius: 18px 4px 18px 18px;
+        padding: 10px 14px;
     }}
     
-    .message.user::after {{
-        content: "";
-        position: absolute;
-        top: 0;
-        right: -10px;
-        width: 0;
-        height: 0;
-        border: 10px solid transparent;
-        border-top-color: #E3F2FD;
-        border-right: 0;
-        border-top: 0;
-    }}
-    
-    .message.bot {{
+    .assistant-message {{
+        float: left;
         background-color: white;
-        margin-right: auto;
-        margin-left: 15px;
-        border-radius: 0 10px 10px 10px;
+        color: #333;
+        border-radius: 4px 18px 18px 18px;
+        padding: 10px 14px;
+        border: 1px solid #EEEEEE;
     }}
     
-    .message.bot::after {{
-        content: "";
-        position: absolute;
-        top: 0;
-        left: -10px;
-        width: 0;
-        height: 0;
-        border: 10px solid transparent;
-        border-top-color: white;
-        border-left: 0;
-        border-top: 0;
+    /* Action buttons within messages */
+    .action-buttons {{
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
     }}
     
-    .message .timestamp {{
-        font-size: 0.7rem;
-        color: #777;
-        text-align: right;
-        margin-top: 4px;
-    }}
-    
-    .message .sender {{
-        font-weight: bold;
+    .action-button {{
+        background-color: white;
+        border: 1px solid {primary_color};
         color: {primary_color};
-        margin-bottom: 4px;
-        font-size: 0.85rem;
+        border-radius: 12px;
+        padding: 4px 10px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
     }}
     
-    @keyframes fadeIn {{
-        from {{ opacity: 0; transform: translateY(10px); }}
-        to {{ opacity: 1; transform: translateY(0); }}
+    .action-button:hover {{
+        background-color: {primary_color};
+        color: white;
+    }}
+    
+    /* Alert messages */
+    .alert {{
+        padding: 8px 12px;
+        border-radius: 8px;
+        margin-top: 8px;
+        font-size: 12px;
+    }}
+    
+    .alert.warning {{
+        background-color: #FFF8E1;
+        border-left: 3px solid {warning_color};
+    }}
+    
+    .alert.error {{
+        background-color: #FFEBEE;
+        border-left: 3px solid {error_color};
+    }}
+    
+    .alert.info {{
+        background-color: #E3F2FD;
+        border-left: 3px solid {primary_color};
     }}
     
     /* Input area */
     .input-area {{
+        padding: 12px 16px;
+        border-top: 1px solid #EEEEEE;
+        background-color: white;
         display: flex;
-        padding: 10px;
-        background-color: #F0F0F0;
-        border-top: 1px solid #E0E0E0;
-        border-radius: 0 0 8px 8px;
+        align-items: center;
     }}
     
-    /* Text input */
-    .stTextInput > div > div > input {{
+    /* Suggestion chips */
+    .suggestions {{
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 12px;
+        padding: 0 16px;
+    }}
+    
+    .suggestion-chip {{
         background-color: white;
+        border: 1px solid #E0E0E0;
+        color: #424242;
+        border-radius: 16px;
+        padding: 6px 12px;
+        font-size: 12px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }}
+    
+    .suggestion-chip:hover {{
+        background-color: #F5F5F5;
+        border-color: #BDBDBD;
+    }}
+    
+    /* Override Streamlit input styles */
+    .stTextInput > div > div > input {{
         border-radius: 20px !important;
-        padding: 10px 15px !important;
-        border: none !important;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+        border: 1px solid #E0E0E0 !important;
+        padding: 8px 16px !important;
     }}
     
     .stTextInput > div > div > input:focus {{
-        border: none !important;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+        border-color: {primary_color} !important;
+        box-shadow: none !important;
     }}
     
     /* Send button */
@@ -199,130 +212,137 @@ st.markdown(f"""
         background-color: {primary_color} !important;
         color: white !important;
         border-radius: 50% !important;
-        width: 40px !important;
-        height: 40px !important;
+        width: 38px !important;
+        height: 38px !important;
         padding: 0 !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+        border: none !important;
     }}
     
-    .send-icon {{
-        font-size: 1.2rem;
-    }}
-    
-    /* Loading animation */
-    .typing-indicator {{
-        padding: 10px 15px;
-        background-color: white;
-        border-radius: 0 10px 10px 10px;
-        width: fit-content;
-        margin-bottom: 10px;
-        margin-left: 15px;
-        position: relative;
-    }}
-    
-    .typing-indicator::after {{
-        content: "";
-        position: absolute;
-        top: 0;
-        left: -10px;
-        width: 0;
-        height: 0;
-        border: 10px solid transparent;
-        border-top-color: white;
-        border-left: 0;
-        border-top: 0;
-    }}
-    
-    .typing-indicator span {{
-        height: 8px;
-        width: 8px;
-        float: left;
-        margin: 0 1px;
-        background-color: {secondary_color};
-        display: block;
-        border-radius: 50%;
-        opacity: 0.4;
-    }}
-    
-    .typing-indicator span:nth-of-type(1) {{
-        animation: 1s blink infinite 0.3333s;
-    }}
-    
-    .typing-indicator span:nth-of-type(2) {{
-        animation: 1s blink infinite 0.6666s;
-    }}
-    
-    .typing-indicator span:nth-of-type(3) {{
-        animation: 1s blink infinite 0.9999s;
-    }}
-    
-    @keyframes blink {{
-        50% {{ opacity: 1; }}
-    }}
-    
-    /* Contamio logo */
-    .contamio-logo {{
-        width: 40px;
-        height: 40px;
-        background-color: white;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        overflow: hidden;
-    }}
-    
-    /* File uploader adjustments */
-    .stFileUploader > div:first-child {{
-        width: 100%;
+    /* File uploader */
+    .upload-container {{
+        border: 1px dashed #BDBDBD;
+        border-radius: 8px;
+        padding: 12px;
+        text-align: center;
+        margin-top: 16px;
+        background-color: #FAFAFA;
     }}
     
     .stFileUploader > div {{
         padding: 0 !important;
     }}
     
-    .uploadedFile {{
-        width: 100%;
+    .stFileUploader > div > div {{
+        padding: 0 !important;
     }}
     
-    /* Sidebar adjustments for RTL */
-    .css-1544g2n {{
-        padding-right: 1rem;
+    /* Minimal logo */
+    .minimal-logo {{
+        display: flex;
+        align-items: center;
     }}
     
-    /* Hide Streamlit footer */
-    footer {{
-        display: none !important;
+    .minimal-logo-icon {{
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }}
     
-    /* Hide hamburger menu */
-    section[data-testid="stSidebar"] {{
-        display: none;
+    /* Typing indicator */
+    .typing-indicator {{
+        display: flex;
+        align-items: center;
+        padding: 10px 14px;
+        background-color: white;
+        border-radius: 4px 18px 18px 18px;
+        width: fit-content;
+        border: 1px solid #EEEEEE;
+        margin-bottom: 12px;
     }}
     
-    /* Make plotly charts fit well in the chat */
+    .typing-indicator span {{
+        height: 8px;
+        width: 8px;
+        margin: 0 1px;
+        display: inline-block;
+        border-radius: 50%;
+        opacity: 0.4;
+        background-color: {primary_color};
+        animation: typing 1s infinite;
+    }}
+    
+    .typing-indicator span:nth-child(1) {{
+        animation-delay: 0s;
+    }}
+    
+    .typing-indicator span:nth-child(2) {{
+        animation-delay: 0.2s;
+    }}
+    
+    .typing-indicator span:nth-child(3) {{
+        animation-delay: 0.4s;
+    }}
+    
+    @keyframes typing {{
+        0% {{ transform: translateY(0); }}
+        50% {{ transform: translateY(-5px); }}
+        100% {{ transform: translateY(0); }}
+    }}
+    
+    /* Ensure plotly charts are responsive */
     .js-plotly-plot {{
         width: 100% !important;
-        margin-bottom: 15px;
     }}
     
-    /* Mobile responsiveness */
+    /* For RTL support if needed */
+    .rtl {{
+        direction: rtl;
+        text-align: right;
+    }}
+    
+    /* Clear fix for message bubbles */
+    .clearfix::after {{
+        content: "";
+        clear: both;
+        display: table;
+    }}
+    
+    /* For the file display area */
+    .file-info {{
+        background-color: #F5F5F5;
+        border-radius: 8px;
+        padding: 8px 12px;
+        margin-top: 8px;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }}
+    
+    .file-info-name {{
+        font-weight: 600;
+        margin-right: 8px;
+    }}
+    
+    /* For mobile responsiveness */
     @media (max-width: 768px) {{
         .chat-container {{
-            height: 85vh;
+            height: 80vh;
         }}
         
         .message {{
-            max-width: 85%;
+            max-width: 90%;
         }}
     }}
 </style>
 """, unsafe_allow_html=True)
 
-# Function to load example data or uploaded data
+# Function to load data
 @st.cache_data
 def load_data(file=None):
     if file is not None:
@@ -333,47 +353,56 @@ def load_data(file=None):
         except Exception as e:
             return None, f"שגיאה בטעינת הקובץ: {str(e)}"
     else:
-        # Check if we already have the file in the app
+        # Try to load the default file
         try:
             df = pd.read_excel("main usa food recall.xlsx")
             return df, None
         except:
-            # Create example data if no file is provided and main file is not found
+            # Simple example data if file not found
             data = {
                 'FEI Number': ['3003398386', '3007734175', '3010323091'] * 10,
                 'Recalling Firm Name': ['Company A Foods', 'Fresh Products Inc.', 'Quality Bakery'] * 10,
                 'Product Classification': ['Class I', 'Class II', 'Class III'] * 10,
                 'Status': ['Ongoing', 'Completed', 'Terminated'] * 10,
-                'Recalling Firm State': ['California', 'Texas', 'New York'] * 10,
                 'Reason for Recall': ['Undeclared milk', 'Foreign material', 'Salmonella contamination'] * 10,
-                'Product Description': ['Organic Cookies', 'Fresh Juice', 'Whole Wheat Bread'] * 10,
-                'Year': [2023, 2024, 2025] * 10,
-                'Month Name': ['January', 'March', 'June'] * 10,
-                'Season': ['Winter', 'Spring', 'Summer'] * 10,
-                'Recall Category': ['Allergen Issues', 'Foreign Material', 'Bacterial Contamination'] * 10,
                 'Food Category': ['Bakery', 'Beverages', 'Dairy'] * 10,
             }
             df = pd.DataFrame(data)
             return df, None
 
-def create_contamio_logo():
+# Minimal Contamio logo in SVG format
+def create_minimal_logo():
     return """
-    <div class="contamio-logo">
-        <svg width="40" height="40" viewBox="0 0 100 100">
-            <circle cx="50" cy="50" r="45" fill="white"/>
-            <g>
-                <circle cx="25" cy="25" r="5" fill="#1E88E5" />
-                <circle cx="50" cy="15" r="7" fill="#1E88E5" />
-                <circle cx="75" cy="25" r="5" fill="#1E88E5" />
-                <circle cx="85" cy="50" r="7" fill="#1E88E5" />
-                <circle cx="75" cy="75" r="5" fill="#1E88E5" />
-                <circle cx="50" cy="85" r="7" fill="#1E88E5" />
-                <circle cx="25" cy="75" r="5" fill="#1E88E5" />
-                <circle cx="15" cy="50" r="7" fill="#1E88E5" />
-            </g>
-        </svg>
+    <div class="minimal-logo">
+        <div class="minimal-logo-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="11" fill="white" stroke="#1E88E5" stroke-width="1"/>
+                <circle cx="6" cy="6" r="1.2" fill="#1E88E5" />
+                <circle cx="12" cy="4" r="1.5" fill="#1E88E5" />
+                <circle cx="18" cy="6" r="1.2" fill="#1E88E5" />
+                <circle cx="20" cy="12" r="1.5" fill="#1E88E5" />
+                <circle cx="18" cy="18" r="1.2" fill="#1E88E5" />
+                <circle cx="12" cy="20" r="1.5" fill="#1E88E5" />
+                <circle cx="6" cy="18" r="1.2" fill="#1E88E5" />
+                <circle cx="4" cy="12" r="1.5" fill="#1E88E5" />
+            </svg>
+        </div>
+        <div>
+            <p class="chat-title">Contamio</p>
+            <p class="chat-description">עוזר נתוני החזרות מזון</p>
+        </div>
     </div>
     """
+
+# Function to get suggested questions
+def get_suggestions():
+    return [
+        "כמה החזרות מזון יש בסך הכל?",
+        "מהן הסיבות הנפוצות להחזרות?",
+        "אילו מוצרים מוחזרים הכי הרבה?",
+        "מה הסיכונים העיקריים?",
+        "אילו אלרגנים מופיעים הכי הרבה?"
+    ]
 
 # Function to analyze data based on user query
 def analyze_query(df, query):
@@ -381,70 +410,82 @@ def analyze_query(df, query):
     
     # Common queries and responses
     if 'כמה החזרות' in query or 'מספר החזרות' in query:
-        return f"סך הכל יש {len(df)} החזרות מזון בבסיס הנתונים."
+        return {
+            "text": f"סך הכל יש {len(df)} החזרות מזון בבסיס הנתונים.",
+            "actions": ["הצג פילוח לפי סוג", "הצג מגמות לאורך זמן"],
+            "alert": None
+        }
     
     elif 'סיבות נפוצות' in query or 'סיבה עיקרית' in query:
-        reason_counts = df['Recall Category'].value_counts().head(5)
+        reason_counts = df['Reason for Recall'].value_counts().head(5)
         fig = px.bar(
             x=reason_counts.index,
             y=reason_counts.values,
             labels={'x': 'סיבת ההחזרה', 'y': 'מספר החזרות'},
             title='הסיבות הנפוצות ביותר להחזרות מזון',
-            color=reason_counts.values,
-            color_continuous_scale='Blues'
+            color_discrete_sequence=["#1E88E5"]
         )
         fig.update_layout(
             plot_bgcolor='rgba(0,0,0,0)',
             paper_bgcolor='rgba(0,0,0,0)',
             margin=dict(l=10, r=10, t=30, b=10),
-            height=300
+            height=250
         )
         
         result = "הסיבות הנפוצות ביותר להחזרות מזון הן:\n"
         for i, (reason, count) in enumerate(reason_counts.items()):
             result += f"{i+1}. {reason}: {count} החזרות\n"
             
-        return result, fig
+        return {
+            "text": result,
+            "chart": fig,
+            "actions": ["פירוט נוסף", "פילוח לפי שנים"],
+            "alert": {
+                "type": "info",
+                "message": "שים לב: אלרגנים הם סיבה משמעותית להחזרות מזון."
+            } if "אלרגן" in result.lower() else None
+        }
     
-    # More analysis functions similar to above
-    # ...
+    elif 'סיכונים' in query or 'סיכון' in query:
+        class_counts = df['Product Classification'].value_counts()
+        class_i_percent = (class_counts.get('Class I', 0) / len(df) * 100) if len(df) > 0 else 0
+        
+        # If Class I recalls are more than 30%, show warning
+        alert = {
+            "type": "warning",
+            "message": f"שים לב: {class_i_percent:.1f}% מההחזרות הן Class I (סיכון גבוה לבריאות)."
+        } if class_i_percent > 30 else None
+        
+        return {
+            "text": f"פילוח ההחזרות לפי רמת סיכון:\n" +
+                   "\n".join([f"{cls}: {count} החזרות ({count/len(df)*100:.1f}%)" 
+                             for cls, count in class_counts.items()]),
+            "actions": ["פילוח לפי קטגוריות מזון", "פירוט סיכונים נפוצים"],
+            "alert": alert
+        }
     
     else:
-        return """לא הצלחתי להבין את השאלה. אנא נסה לשאול על נתוני ההחזרות בצורה אחרת, למשל:
-- כמה החזרות מזון יש בסך הכל?
-- מהן הסיבות הנפוצות להחזרות?
-- איזה סוג מזון מוחזר הכי הרבה?"""
+        return {
+            "text": "לא הצלחתי להבין את השאלה. אנא נסה לשאול על נתוני ההחזרות בצורה אחרת או בחר אחת מההצעות למעלה.",
+            "actions": ["הצג סטטיסטיקה כללית", "עזרה בשימוש בצ'אטבוט"],
+            "alert": None
+        }
 
 # Function to get response from Claude API
 def get_claude_response(df, query, chat_history=[]):
     try:
-        # שימוש במפתח API מרכזי
+        # Check for API key
         claude_api_key = CLAUDE_API_KEY
         
-        # אם המפתח לא מוגדר, חזור לניתוח הבסיסי
+        # If no API key, use basic analysis
         if not claude_api_key:
             return analyze_query(df, query)
             
-        # קבלת המודל הנבחר
-        claude_model = "claude-3-haiku-20240307"
-            
-        # Prepare data summary for Claude
+        # Prepare DataFrame summary
         columns_info = "\n".join([f"- {col}: {str(df[col].dtype)}" for col in df.columns])
         total_recalls = len(df)
         
-        # Get top recall reasons if available
-        top_reasons = ""
-        if 'Recall Category' in df.columns:
-            reasons = df['Recall Category'].value_counts().head(5)
-            top_reasons = "\n".join([f"- {reason}: {count} recalls" for reason, count in reasons.items()])
-        
-        # Get classification breakdown if available
-        classifications = ""
-        if 'Product Classification' in df.columns:
-            class_counts = df['Product Classification'].value_counts()
-            classifications = "\n".join([f"- {cls}: {count} recalls ({count/total_recalls*100:.1f}%)" for cls, count in class_counts.items()])
-        
-        # Prepare the system prompt
+        # System prompt
         system_prompt = f"""
         אתה עוזר מומחה לניתוח נתוני החזרות מזון. המשתמש שואל שאלות לגבי נתוני האקסל שמכילים מידע על החזרות מזון בארה"ב.
 
@@ -453,19 +494,13 @@ def get_claude_response(df, query, chat_history=[]):
         - העמודות הזמינות בנתונים:
         {columns_info}
         
-        הסיבות העיקריות להחזרות:
-        {top_reasons}
-        
-        התפלגות סיווגי ההחזרות:
-        {classifications}
-        
         כשתענה:
         1. השתמש בעברית בלבד
-        2. ספק תשובות ישירות ומבוססות נתונים
-        3. אם אתה לא יכול להשיב על שאלה בהתבסס על הנתונים, ציין זאת בבירור
-        4. השב בפורמט שנוח לקריאה ובקצרה
+        2. ספק תשובות ישירות, קצרות וממוקדות
+        3. הצג תובנות חשובות בצורה ברורה
+        4. אם יש סיכונים משמעותיים, ציין אותם בבירור
 
-        אתה משתמש בצ'אט, אז תשובות קצרות וממוקדות טובות יותר מתשובות ארוכות.
+        התשובות שלך ישולבו בממשק צ'אט מינימליסטי, לכן יש להעדיף תשובות קצרות וממוקדות.
         """
         
         # Convert DataFrame sample to JSON for easier processing
@@ -475,25 +510,24 @@ def get_claude_response(df, query, chat_history=[]):
         messages = []
         
         # Add chat history (up to last 5 exchanges)
-        for msg in chat_history[-10:]:
-            messages.append({"role": msg["role"], "content": msg["content"] if isinstance(msg["content"], str) else "ראה גרף/תרשים"})
+        for msg in chat_history[-5:]:
+            if isinstance(msg["content"], dict):
+                content = msg["content"].get("text", "")
+            else:
+                content = msg["content"]
+            messages.append({"role": msg["role"], "content": content})
         
-        # Add the current query with data samples
-        messages.append({"role": "user", "content": f"""
-        שאלה: {query}
-        
-        הנה דוגמה של 10 שורות מהנתונים:
-        {sample_data}
-        """})
+        # Add current query
+        messages.append({"role": "user", "content": query})
         
         # Initialize Claude client
         client = anthropic.Anthropic(api_key=claude_api_key)
         
         # Call Claude API
         response = client.messages.create(
-            model=claude_model,
-            max_tokens=500,  # Shorter responses for chat style
-            temperature=0.3,
+            model="claude-3-haiku-20240307",
+            max_tokens=300,
+            temperature=0.2,
             system=system_prompt,
             messages=messages
         )
@@ -501,135 +535,217 @@ def get_claude_response(df, query, chat_history=[]):
         # Get Claude's response
         claude_text = response.content[0].text
         
-        # Try to get our standard analysis as well
+        # Check for important alerts in the response
+        alert = None
+        if any(word in claude_text.lower() for word in ["חשוב לציין", "שים לב", "חשוב להדגיש", "אזהרה", "סיכון"]):
+            alert = {
+                "type": "warning",
+                "message": next((s for s in claude_text.split('.') 
+                                if any(word in s.lower() for word in 
+                                       ["חשוב לציין", "שים לב", "חשוב להדגיש", "אזהרה", "סיכון"])), 
+                                None)
+            }
+            # Remove the alert from the main text
+            if alert["message"]:
+                claude_text = claude_text.replace(alert["message"], "")
+        
+        # Suggest relevant actions based on the query
+        actions = []
+        if "סיבות" in query.lower() or "סיבה" in query.lower():
+            actions = ["פילוח לפי קטגוריות", "הצג מגמות לאורך זמן"]
+        elif "כמה" in query.lower() or "מספר" in query.lower():
+            actions = ["הצג פילוח", "השוואה לשנה קודמת"]
+        else:
+            actions = ["מידע נוסף", "הצג נתונים מפורטים"]
+        
+        # Try to get visualization if appropriate
         standard_analysis = analyze_query(df, query)
         
-        # If standard analysis returned a figure, pair it with Claude's text
-        if isinstance(standard_analysis, tuple) and len(standard_analysis) == 2:
-            return claude_text, standard_analysis[1]
-        else:
-            return claude_text
+        # Return full response
+        result = {
+            "text": claude_text.strip(),
+            "actions": actions,
+            "alert": alert
+        }
+        
+        # Add chart if available in standard analysis
+        if isinstance(standard_analysis, dict) and "chart" in standard_analysis:
+            result["chart"] = standard_analysis["chart"]
+            
+        return result
             
     except Exception as e:
-        return f"שגיאה בהתחברות ל-Claude API: {str(e)}\n\nאנא ודא שמפתח ה-API תקין ושהאפליקציה מוגדרת כראוי."
+        return {
+            "text": f"שגיאה בהתחברות ל-Claude API. אנא ודא שהמפתח תקין.",
+            "alert": {
+                "type": "error",
+                "message": f"פרטי השגיאה: {str(e)}"
+            }
+        }
 
 # Main application
 def main():
     # Load data
-    df, error = load_data(None)  # Try to load the main data file
+    df, error = load_data(None)
     
     if error:
         st.error(error)
         return
     
-    # Chat interface
+    # File uploader in sidebar (optional)
+    with st.sidebar:
+        st.title("העלאת קובץ")
+        uploaded_file = st.file_uploader("העלה קובץ אקסל להחלפת נתוני ברירת המחדל", type=["xlsx", "xls"])
+        
+        if uploaded_file is not None:
+            df, upload_error = load_data(uploaded_file)
+            if upload_error:
+                st.error(upload_error)
+    
     # Chat header
     st.markdown(f"""
     <div class="chat-header">
-        {create_contamio_logo()}
-        <div class="chat-header-info">
-            <h3>Contamio</h3>
-            <p>צ'אטבוט נתוני החזרות מזון</p>
-        </div>
+        {create_minimal_logo()}
     </div>
     """, unsafe_allow_html=True)
     
-    # Create chat container
+    # Chat container
     st.markdown('<div class="chat-container">', unsafe_allow_html=True)
     
-    # Messages container
-    st.markdown('<div class="messages-container">', unsafe_allow_html=True)
+    # Suggestion chips
+    st.markdown('<div class="suggestions rtl">', unsafe_allow_html=True)
+    for suggestion in get_suggestions():
+        st.markdown(f"""
+            <div class="suggestion-chip" 
+                 onclick="document.querySelector('input[aria-label=\"\"]').value='{suggestion}'; 
+                         document.querySelector('input[aria-label=\"\"]').dispatchEvent(new Event('input', {{bubbles:true}}));">
+                {suggestion}
+            </div>
+        """, unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
     
-    # Initialize or retrieve the chat history from session state
+    # Messages area
+    st.markdown('<div class="messages-area">', unsafe_allow_html=True)
+    
+    # Initialize chat history
     if 'messages' not in st.session_state:
         st.session_state.messages = [
-            {"role": "assistant", "content": 'שלום! אני עוזר מידע חכם לנתוני החזרות מזון. במה אוכל לעזור לך?'}
+            {"role": "assistant", "content": {
+                "text": "שלום! אני עוזר החזרות המזון של Contamio. כיצד אוכל לעזור לך היום?",
+                "actions": ["הצג סטטיסטיקה כללית", "מהן החזרות המזון האחרונות?"],
+                "alert": None
+            }}
         ]
     
     # Display chat messages
-    for message in st.session_state.messages:
-        current_time = time.strftime("%H:%M")
-        
-        if message["role"] == "user":
+    for msg in st.session_state.messages:
+        if msg["role"] == "user":
+            # User message
             st.markdown(f"""
-            <div class="message user">
-                <div class="content">{message["content"]}</div>
-                <div class="timestamp">{current_time}</div>
+            <div class="clearfix">
+                <div class="message user-message rtl">
+                    {msg["content"]}
+                </div>
             </div>
             """, unsafe_allow_html=True)
         else:
-            if isinstance(message["content"], tuple) and len(message["content"]) == 2:
-                text, fig = message["content"]
-                st.markdown(f"""
-                <div class="message bot">
-                    <div class="sender">Contamio</div>
-                    <div class="content">{text}</div>
-                    <div class="timestamp">{current_time}</div>
+            # Assistant message
+            content = msg["content"]
+            
+            # For backward compatibility
+            if isinstance(content, str):
+                content = {"text": content, "actions": [], "alert": None}
+            
+            st.markdown(f"""
+            <div class="clearfix">
+                <div class="message assistant-message rtl">
+                    {content["text"]}
+                    
+                    {f'''
+                    <div class="action-buttons">
+                        {"".join([f'<button class="action-button">{action}</button>' for action in content["actions"]])}
+                    </div>
+                    ''' if content.get("actions") else ''}
+                    
+                    {f'''
+                    <div class="alert {content["alert"]["type"]}">
+                        {content["alert"]["message"]}
+                    </div>
+                    ''' if content.get("alert") else ''}
                 </div>
-                """, unsafe_allow_html=True)
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.markdown(f"""
-                <div class="message bot">
-                    <div class="sender">Contamio</div>
-                    <div class="content">{message["content"]}</div>
-                    <div class="timestamp">{current_time}</div>
-                </div>
-                """, unsafe_allow_html=True)
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Display chart if available
+            if isinstance(content, dict) and "chart" in content:
+                st.plotly_chart(content["chart"], use_container_width=True)
     
-    # Show typing indicator if processing
+    # Typing indicator
     if 'thinking' in st.session_state and st.session_state.thinking:
         st.markdown("""
         <div class="typing-indicator">
             <span></span><span></span><span></span>
         </div>
         """, unsafe_allow_html=True)
+            
+    st.markdown('</div>', unsafe_allow_html=True)  # Close messages area
     
-    st.markdown('</div>', unsafe_allow_html=True)  # Close messages container
+    # Input area
+    st.markdown('<div class="input-area">', unsafe_allow_html=True)
     
-    # Input area for chat
     col1, col2 = st.columns([6, 1])
     
     with col1:
-        user_input = st.text_input("", placeholder="הקלד הודעה...", label_visibility="collapsed")
+        user_input = st.text_input("", placeholder="הקלד שאלה על נתוני החזרות...", label_visibility="collapsed")
     
     with col2:
-        send_pressed = st.button("📤", help="שלח")
+        send_pressed = st.button("↑", help="שלח")
     
-    st.markdown('</div>', unsafe_allow_html=True)  # Close chat container
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Close the chat container
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Display file information if a file is uploaded
+    if uploaded_file is not None:
+        st.markdown(f"""
+        <div class="file-info">
+            <span class="file-info-name">{uploaded_file.name}</span>
+            <span>{len(df)} רשומות</span>
+        </div>
+        """, unsafe_allow_html=True)
     
     # Process user input
     if send_pressed and user_input:
-        # Add user message to chat history
+        # Add user message
         st.session_state.messages.append({"role": "user", "content": user_input})
         
-        # Set thinking state and rerun to show typing indicator
+        # Set thinking state
         st.session_state.thinking = True
         st.experimental_rerun()
 
-# Process thinking state
+# Process message when in thinking state
 if __name__ == "__main__":
     main()
     
-    # Process thinking state
     if 'thinking' in st.session_state and st.session_state.thinking:
-        # Get the last user message
-        last_user_message = st.session_state.messages[-1]["content"]
+        # Get last user message
+        last_message = st.session_state.messages[-1]["content"]
         
         # Load data
         df, _ = load_data(None)
         
-        # Get chat history for context (excluding the last user message)
+        # Get chat history
         chat_history = st.session_state.messages[:-1]
         
-        # Get response from Claude API
-        response = get_claude_response(df, last_user_message, chat_history)
+        # Get response
+        response = get_claude_response(df, last_message, chat_history)
         
-        # Add assistant response to chat history
+        # Add to chat history
         st.session_state.messages.append({"role": "assistant", "content": response})
         
         # Clear thinking state
         st.session_state.thinking = False
         
-        # Clear the input field
+        # Rerun to update UI
         st.experimental_rerun()
