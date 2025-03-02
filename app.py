@@ -601,6 +601,7 @@ def main():
     
     # Ask Contamio Tab
     # Ask Contamio Tab
+        # Ask Contamio Tab
     with tabs[1]:
         st.header("Ask Contamio about Food Recalls")
     
@@ -610,11 +611,11 @@ def main():
         .chat-container {
             display: flex;
             flex-direction: column;
-            height: 70vh;
+            height: 60vh;
             overflow-y: auto;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             padding: 10px;
-            background-color: #f5f5f5;
+            background-color: #f8f9fa;
             border-radius: 10px;
         }
         .message-container {
@@ -629,9 +630,9 @@ def main():
             justify-content: flex-start;
         }
         .message-bubble {
-            padding: 10px 15px;
+            padding: 12px 16px;
             border-radius: 18px;
-            max-width: 75%;
+            max-width: 80%;
             word-wrap: break-word;
         }
         .user-bubble {
@@ -645,80 +646,125 @@ def main():
             color: #333;
             border-top-left-radius: 5px;
         }
-        .chat-input-container {
-            position: sticky;
-            bottom: 0;
-            background-color: white;
-            padding: 10px;
-            border-radius: 10px;
-            box-shadow: 0px -2px 5px rgba(0,0,0,0.05);
-        }
         .thinking-bubble {
             background-color: #e8eaf6;
             color: #5c6bc0;
             font-style: italic;
         }
+        .input-area {
+            display: flex;
+            margin-top: 10px;
+        }
+        .chat-input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            margin-right: 10px;
+        }
+        .send-button {
+            background-color: #00a3e0;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
         </style>
         """, unsafe_allow_html=True)
     
-        # Initialize chat history if it doesn't exist
+        # Initialize session states
         if "chat_history" not in st.session_state:
             st.session_state.chat_history = []
+            
+        if "thinking" not in st.session_state:
+            st.session_state.thinking = False
+        
+        if "user_input" not in st.session_state:
+            st.session_state.user_input = ""
+    
+        # Function to handle sending a message
+        def send_message():
+            if st.session_state.widget_input and not st.session_state.thinking:
+                user_message = st.session_state.widget_input
+            
+                # Add to chat history
+                st.session_state.chat_history.append({"role": "user", "content": user_message})
+                
+                # Clear the input box by setting it to empty string
+                st.session_state.widget_input = ""
+            
+                # Set thinking state to true
+                st.session_state.thinking = True
+                
+                # Rerun to show the user message and thinking indicator
+                st.rerun()
     
         # Create chat container
-        st.markdown('<div class="chat-container" id="chat-container">', unsafe_allow_html=True)
+        chat_container = st.container()
     
-        # Display initial message if chat is empty
-        if not st.session_state.chat_history:
-            st.markdown("""
-            <div class="message-container assistant-container">
-                <div class="message-bubble assistant-bubble">
-                    Hello! I'm Contamio, your food safety assistant. I can help you understand food recall data and identify potential risks.
-                    <br><br>
-                    You can ask me questions like:
-                    <br>- What are the most common reasons for dairy product recalls?
-                    <br>- Are there seasonal patterns in E. coli contamination?
-                    <br>- What food categories have the highest recall rates?
-                    <br>- What should I know about allergen-related recalls?
-                    <br><br>
-                    I'll analyze the data to help you understand food safety risks and trends.
+        with chat_container:
+            st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+        
+            # Display initial message if chat is empty
+            if not st.session_state.chat_history and not st.session_state.thinking:
+                st.markdown("""
+                <div class="message-container assistant-container">
+                    <div class="message-bubble assistant-bubble">
+                        Hello! I'm Contamio, your food safety assistant. I can help you understand food recall data and identify potential risks.
+                        <br><br>
+                        You can ask me questions like:
+                        <br>- What are the most common reasons for dairy product recalls?
+                        <br>- Are there seasonal patterns in E. coli contamination?
+                        <br>- What food categories have the highest recall rates?
+                        <br>- What should I know about allergen-related recalls?
+                        <br><br>
+                        I'll analyze the data to help you understand food safety risks and trends.
+                    </div>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-            # Add this welcome message to history
-            st.session_state.chat_history.append({
-                "role": "assistant", 
-                "content": "Hello! I'm Contamio, your food safety assistant. I can help you understand food recall data and identify potential risks."
-            })
-    
-        # Display chat messages
-        for message in st.session_state.chat_history:
-            bubble_class = "user-bubble" if message["role"] == "user" else "assistant-bubble"
-            container_class = "user-container" if message["role"] == "user" else "assistant-container"
-        
-            st.markdown(f"""
-            <div class="message-container {container_class}">
-                <div class="message-bubble {bubble_class}">
-                    {message["content"]}
+                """, unsafe_allow_html=True)
+            
+                # Only add to history once
+                if len(st.session_state.chat_history) == 0:
+                    st.session_state.chat_history.append({
+                        "role": "assistant", 
+                        "content": "Hello! I'm Contamio, your food safety assistant. I can help you understand food recall data and identify potential risks."
+                    })
+            
+            # Display chat messages
+            for message in st.session_state.chat_history:
+                bubble_class = "user-bubble" if message["role"] == "user" else "assistant-bubble"
+                container_class = "user-container" if message["role"] == "user" else "assistant-container"
+            
+                st.markdown(f"""
+                <div class="message-container {container_class}">
+                    <div class="message-bubble {bubble_class}">
+                        {message["content"]}
+                    </div>
                 </div>
-            </div>
-            """, unsafe_allow_html=True)
-    
-        # Close the chat container
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-        # Chat input container - always at the bottom
-        st.markdown('<div class="chat-input-container">', unsafe_allow_html=True)
-        user_input = st.text_input("Ask about food recalls...", key="chat_input")
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-        if user_input:
-            # Add user message to chat history
-            st.session_state.chat_history.append({"role": "user", "content": user_input})
+                """, unsafe_allow_html=True)
         
-            # Add thinking message (will be removed after processing)
-            st.session_state.thinking = True
+            # Display thinking animation if processing
+            if st.session_state.thinking:
+                st.markdown("""
+                <div class="message-container assistant-container">
+                    <div class="message-bubble thinking-bubble">
+                        Analyzing food recall data...
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+        
+            # Close the chat container
+            st.markdown('</div>', unsafe_allow_html=True)
+    
+        # Process any pending thinking state
+        if st.session_state.thinking:
+            # Get the last user message
+            user_input = st.session_state.chat_history[-1]["content"]
         
             # Format conversation history for Claude
             claude_messages = [
@@ -757,24 +803,23 @@ def main():
         
             # Query Claude with enhanced prompt
             response = query_claude(user_input, claude_messages[-10:], system_prompt)
-        
+            
             # Add assistant response to chat history
             st.session_state.chat_history.append({"role": "assistant", "content": response})
             st.session_state.thinking = False
-        
-            # Rerun to update the chat display
-            st.rerun()
-    
-        # Display thinking animation if processing
-        if st.session_state.get("thinking", False):
-            st.markdown("""
-            <div class="message-container assistant-container">
-                <div class="message-bubble thinking-bubble">
-                    Analyzing food recall data...
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
             
+            # Rerun to update the chat display without the thinking indicator
+            st.rerun()
+        
+        # Chat input with send button (using columns for layout)
+        col1, col2 = st.columns([6, 1])
+        
+        with col1:
+            st.text_input("", placeholder="Ask about food recalls...", key="widget_input", on_change=send_message)
+        
+        with col2:
+            if st.button("Send", key="send_button", disabled=st.session_state.thinking):
+                send_message()
     # Insights Tab
     with tabs[2]:
         st.header("Food Recall Insights")
