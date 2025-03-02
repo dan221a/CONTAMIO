@@ -598,6 +598,19 @@ def main():
     
         # Show only a limited number of rows to avoid overwhelming the UI
         st.dataframe(display_data[display_columns].head(50), use_container_width=True)
+        # בתוך ה-Dashboard tab, בסוף
+
+        st.subheader("📊 Key Insights")
+
+        # חישוב תובנות בסיסיות
+        insights = get_basic_insights(df)
+
+        # הצגת התובנות
+        if insights:
+            for insight in insights:
+                st.info(insight)
+        else:
+            st.info("No significant insights detected in the current data.")
     
 
 
