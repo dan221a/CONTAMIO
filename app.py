@@ -660,6 +660,12 @@ def main():
                 {"role": "assistant", "content": "שלום! אני קונטמיו, עוזר בטיחות המזון שלך. אני יכול לעזור לך להבין נתוני recall מזון ולזהות סיכונים פוטנציאליים.\n\nאתה יכול לשאול אותי שאלות כמו:\n\n- מהן הסיבות הנפוצות ביותר לריקול מוצרי חלב?\n- האם יש דפוסים עונתיים בזיהום E. coli?\n- אילו קטגוריות מזון יש להן את שיעורי הריקול הגבוהים ביותר?\n- מה עלי לדעת לגבי ריקולים הקשורים לאלרגנים?\n\nאני אנתח את הנתונים כדי לעזור לך להבין סיכוני בטיחות מזון ומגמות."}
             ]
         
+        if "thinking" not in st.session_state:
+            st.session_state.thinking = False
+            
+        if "user_message_sent" not in st.session_state:
+            st.session_state.user_message_sent = False
+        
         # Header
         st.markdown("""
         <div style="background-color: #00a3e0; color: white; padding: 10px 15px; display: flex; align-items: center; border-radius: 10px 10px 0 0;">
@@ -688,23 +694,24 @@ def main():
         messages_html += '</div>'
         chat_placeholder.markdown(messages_html, unsafe_allow_html=True)
         
-        # Input area
-        col1, col2 = st.columns([5, 1])
-        with col1:
-            user_input = st.text_input("", placeholder="Type a message...", key="user_input", label_visibility="collapsed")
-        with col2:
-            send_button = st.button("Send", disabled=st.session_state.get("thinking", False))
-            
-        # Process user input
-        if (send_button or user_input) and user_input and not st.session_state.get("thinking", False):
+        # Use a form to prevent automatic resubmission
+        with st.form(key="chat_form", clear_on_submit=True):
+            # Input area
+            col1, col2 = st.columns([5, 1])
+            with col1:
+                user_input = st.text_input("", placeholder="Type a message...", key="user_input", label_visibility="collapsed")
+            with col2:
+                send_button = st.form_submit_button("Send", disabled=st.session_state.get("thinking", False))
+        
+        # Process user input - only when form is submitted
+        if send_button and user_input and not st.session_state.get("thinking", False):
             # Add user message to chat history
             st.session_state.messages.append({"role": "user", "content": user_input})
             
             # Set thinking state
             st.session_state.thinking = True
             
-            # Clear input by forcing a rerun
-            st.experimental_set_query_params()  # This clears text inputs
+            # Rerun to update UI with user message and thinking state
             st.rerun()
             
         # Process thinking state
