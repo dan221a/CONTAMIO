@@ -601,349 +601,99 @@ def main():
     
 
 
-        # Ask Contamio Tab
-    with tabs[1]:
-        # Remove header to make it more minimalist
+# Ask Contamio Tab
+     with tabs[1]:
+        st.markdown("<h3 style='margin-bottom: 20px;'>Chat with Contamio</h3>", unsafe_allow_html=True)
         
-        # Modern WhatsApp-style chat CSS
+        # Initialize session state for messages
+        if "messages" not in st.session_state:
+            st.session_state.messages = [
+                {"role": "assistant", "content": "Hello! I'm Contamio, your food safety assistant. I can help you understand food recall data and identify potential risks.\n\nYou can ask me questions like:\n- What are the most common reasons for dairy product recalls?\n- Are there seasonal patterns in E. coli contamination?\n- What food categories have the highest recall rates?\n- What should I know about allergen-related recalls?\n\nI'll analyze the data to help you understand food safety risks and trends."}
+            ]
+        
+        # Simple, clean styling that works reliably
         st.markdown("""
         <style>
-            /* Main chat container */
-            .chat-window {
-                height: 70vh;
-                background-color: #f0f2f5;
-                border-radius: 12px;
-                margin-bottom: 10px;
-                display: flex;
-                flex-direction: column;
-                overflow: hidden;
-                box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-            }
-            
-            /* Chat header */
-            .chat-header {
-                background-color: #00a3e0;
-                color: white;
-                padding: 12px 16px;
-                display: flex;
-                align-items: center;
-                border-top-left-radius: 12px;
-                border-top-right-radius: 12px;
-            }
-            
-            .chat-header img {
-                width: 40px;
-                height: 40px;
-                border-radius: 50%;
-                margin-right: 12px;
-            }
-            
-            .chat-header-info h3 {
-                margin: 0;
-                font-size: 16px;
-                font-weight: 600;
-            }
-            
-            .chat-header-info p {
-                margin: 0;
-                font-size: 13px;
-                opacity: 0.8;
-            }
-            
-            /* Chat messages area */
-            .chat-body {
-                flex: 1;
-                padding: 16px;
-                overflow-y: auto;
-                background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23dddddd' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E");
-            }
-            
-            /* Message bubbles */
-            .message {
-                display: flex;
-                margin-bottom: 12px;
-            }
-            
-            .message.user {
-                justify-content: flex-end;
-            }
-            
-            .message.assistant {
-                justify-content: flex-start;
-            }
-            
-            .message-bubble {
-                max-width: 75%;
-                padding: 10px 14px;
-                border-radius: 16px;
-                position: relative;
-                word-wrap: break-word;
-                box-shadow: 0 1px 1px rgba(0,0,0,0.05);
-            }
-            
-            .user .message-bubble {
-                background-color: white;
-                color: #262626;
-                border-top-right-radius: 4px;
-            }
-            
-            .assistant .message-bubble {
-                background-color: #d9eeff;
-                color: #262626;
-                border-top-left-radius: 4px;
-            }
-            
-            .message-time {
-                font-size: 11px;
-                color: #8696a0;
-                text-align: right;
-                margin-top: 2px;
-            }
-            
-            /* Typing indicator */
-            .typing {
-                padding: 10px 14px;
-                background-color: #d9eeff;
-                border-radius: 16px;
-                border-top-left-radius: 4px;
-                display: inline-block;
-                color: #505050;
-                font-style: italic;
-                max-width: 75%;
-                animation: pulse 1.5s infinite;
-            }
-            
-            @keyframes pulse {
-                0% { opacity: 0.6; }
-                50% { opacity: 1; }
-                100% { opacity: 0.6; }
-            }
-            
-            /* Chat footer */
-            .chat-footer {
-                background-color: #f0f2f5;
-                padding: 10px;
-                display: flex;
-                align-items: center;
-                border-bottom-left-radius: 12px;
-                border-bottom-right-radius: 12px;
-                border-top: 1px solid #e0e0e0;
-            }
-            
-            .chat-footer input {
-                flex: 1;
-                border: none;
-                outline: none;
-                background-color: white;
-                padding: 10px 16px;
-                border-radius: 20px;
-                font-size: 15px;
-                box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-            }
-            
-            .chat-footer button {
-                margin-left: 10px;
-                border: none;
-                background-color: #00a3e0;
-                color: white;
-                border-radius: 50%;
-                width: 40px;
-                height: 40px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                cursor: pointer;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                transition: background-color 0.2s ease;
-            }
-            
-            .chat-footer button:hover {
-                background-color: #0091c7;
-            }
-            
-            .chat-footer button:disabled {
-                background-color: #a0d4e5;
-                cursor: not-allowed;
-            }
-            
-            /* Hide default Streamlit elements we don't need */
-            .stTextInput > div > div > input {
-                border: none !important;
-                font-size: 15px !important;
-            }
-            
-            .stButton > button {
-                border: none !important;
-                padding: 0 !important;
-            }
-            
-            /* Make sure our custom elements take precedence */
-            div[data-testid="stVerticalBlock"] {
-                gap: 0 !important;
-            }
+        .chat-container {
+            padding: 20px;
+            border-radius: 10px;
+            background-color: #f8f9fa;
+            margin-bottom: 20px;
+            height: 400px;
+            overflow-y: auto;
+        }
+        .user-message {
+            background-color: white;
+            border-radius: 10px;
+            padding: 10px 15px;
+            margin: 5px 0;
+            margin-left: 20%;
+            margin-right: 5px;
+            border: 1px solid #e0e0e0;
+        }
+        .assistant-message {
+            background-color: #e3f2fd;
+            border-radius: 10px;
+            padding: 10px 15px;
+            margin: 5px 0;
+            margin-right: 20%;
+            margin-left: 5px;
+        }
+        .timestamp {
+            font-size: 0.8em;
+            color: #888;
+            text-align: right;
+            margin-top: 5px;
+        }
+        .stTextInput > div > div > input {
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border-radius: 20px !important;
+        }
         </style>
         """, unsafe_allow_html=True)
         
-        # Initialize session state
-        if "messages" not in st.session_state:
-            st.session_state.messages = [{
-                "role": "assistant",
-                "content": "Hello! I'm Contamio, your food safety assistant. I can help you understand food recall data and identify potential risks.",
-                "examples": True,
-                "time": "Just now"
-            }]
-        
-        if "thinking" not in st.session_state:
-            st.session_state.thinking = False
-        
-        # Main chat window with header, body, and footer
-        st.markdown("""
-        <div class="chat-window">
-            <div class="chat-header">
-                <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MDAgMzAwIj48Y2lyY2xlIGN4PSIyMDAiIGN5PSIxNTAiIHI9IjEyMCIgZmlsbD0ibm9uZSIvPjxjaXJjbGUgY3g9IjIwMCIgY3k9IjE1MCIgcj0iMjAiIGZpbGw9IiNmZmZmZmYiLz48Y2lyY2xlIGN4PSIxMjAiIGN5PSIxNTAiIHI9IjE1IiBmaWxsPSIjZmZmZmZmIi8+PGNpcmNsZSBjeD0iMjgwIiBjeT0iMTUwIiByPSIxNSIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjE0MCIgY3k9IjkwIiByPSIxMCIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjI2MCIgY3k9IjkwIiByPSIxMCIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjE0MCIgY3k9IjIxMCIgcj0iMTAiIGZpbGw9IiNmZmZmZmYiLz48Y2lyY2xlIGN4PSIyNjAiIGN5PSIyMTAiIHI9IjEwIiBmaWxsPSIjZmZmZmZmIi8+PGNpcmNsZSBjeD0iMTcwIiBjeT0iNzAiIHI9IjgiIGZpbGw9IiNmZmZmZmYiLz48Y2lyY2xlIGN4PSIyMzAiIGN5PSI3MCIgcj0iOCIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjE3MCIgY3k9IjIzMCIgcj0iOCIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjIzMCIgY3k9IjIzMCIgcj0iOCIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjIwMCIgY3k9IjUwIiByPSIxMiIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjIwMCIgY3k9IjI1MCIgcj0iMTIiIGZpbGw9IiNmZmZmZmYiLz48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxMTAiIHI9IjYiIGZpbGw9IiNmZmZmZmYiLz48Y2lyY2xlIGN4PSIzMDAiIGN5PSIxMTAiIHI9IjYiIGZpbGw9IiNmZmZmZmYiLz48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxOTAiIHI9IjYiIGZpbGw9IiNmZmZmZmYiLz48Y2lyY2xlIGN4PSIzMDAiIGN5PSIxOTAiIHI9IjYiIGZpbGw9IiNmZmZmZmYiLz48L3N2Zz4=" alt="Contamio Logo">
-                <div class="chat-header-info">
-                    <h3>Contamio</h3>
-                    <p>Food Safety Assistant</p>
-                </div>
-            </div>
+        # Display chat messages in a container with fixed height
+        chat_container = st.container()
+        with chat_container:
+            st.markdown('<div class="chat-container">', unsafe_allow_html=True)
             
-            <div class="chat-body" id="chat-body">
-        """, unsafe_allow_html=True)
-        
-        # Generate messages HTML
-        for message in st.session_state.messages:
-            role_class = "user" if message["role"] == "user" else "assistant"
+            # Display all messages
+            for message in st.session_state.messages:
+                if message["role"] == "user":
+                    st.markdown(f'<div class="user-message">{message["content"]}</div>', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'<div class="assistant-message">{message["content"]}</div>', unsafe_allow_html=True)
             
-            # Special handling for the first welcome message with examples
-            if message.get("examples", False):
-                st.markdown(f"""
-                <div class="message {role_class}">
-                    <div class="message-bubble">
-                        Hello! I'm Contamio, your food safety assistant. I can help you understand food recall data and identify potential risks.
-                        <br><br>
-                        You can ask me questions like:
-                        <br>- What are the most common reasons for dairy product recalls?
-                        <br>- Are there seasonal patterns in E. coli contamination?
-                        <br>- What food categories have the highest recall rates?
-                        <br>- What should I know about allergen-related recalls?
-                        <br><br>
-                        I'll analyze the data to help you understand food safety risks and trends.
-                        <div class="message-time">{message["time"]}</div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown(f"""
-                <div class="message {role_class}">
-                    <div class="message-bubble">
-                        {message["content"]}
-                        <div class="message-time">{message["time"]}</div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+            # Display thinking indicator if processing
+            if st.session_state.get("thinking", False):
+                st.markdown('<div class="assistant-message">Analyzing food recall data...</div>', unsafe_allow_html=True)
+                
+            st.markdown('</div>', unsafe_allow_html=True)
         
-        # Show thinking indicator if applicable
-        if st.session_state.thinking:
-            st.markdown("""
-            <div class="message assistant">
-                <div class="typing">Analyzing food recall data...</div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # Close the chat body
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-        # Chat footer with input and send button
-        col1, col2 = st.columns([5, 1])
-        
-        with col1:
-            user_input = st.text_input("", 
-                                       placeholder="Type a message", 
-                                       label_visibility="collapsed",
-                                       key="user_input")
-        
-        with col2:
-            send_disabled = st.session_state.thinking
-            send_button = st.button("Send", disabled=send_disabled, key="send_button")
+        # Input area at bottom
+        with st.container():
+            # Use columns for input and button layout
+            col1, col2 = st.columns([5, 1])
             
-            # Use custom styled button instead of Streamlit's
-            if not send_disabled:
-                st.markdown("""
-                <script>
-                    document.querySelector("[data-testid='stButton'] button").style.display = "none";
-                    document.querySelector(".chat-footer button").addEventListener("click", function() {
-                        document.querySelector("[data-testid='stButton'] button").click();
-                    });
-                </script>
-                """, unsafe_allow_html=True)
+            with col1:
+                user_input = st.text_input("", placeholder="Type a message...", key="chat_input", label_visibility="collapsed")
+            
+            with col2:
+                send_button = st.button("Send", use_container_width=True, disabled=st.session_state.get("thinking", False))
         
-        # Close the chat window
-        st.markdown("""
-            <div class="chat-footer">
-                <input type="text" placeholder="Type a message" id="message-input">
-                <button id="send-button">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M2.01 21L23 12 2.01 3 2 10L17 12 2 14L2.01 21Z" fill="white"/>
-                    </svg>
-                </button>
-            </div>
-        </div>
-        
-        <script>
-            // Connect Streamlit elements to our custom UI
-            const realInput = document.querySelector("input[data-testid='stTextInput']");
-            const customInput = document.getElementById("message-input");
-            const realSendButton = document.querySelector("[data-testid='stButton'] button");
-            const customSendButton = document.getElementById("send-button");
-            
-            // Sync the custom input with the Streamlit input
-            customInput.addEventListener("input", function() {
-                realInput.value = this.value;
-                // Trigger event to update Streamlit
-                const event = new Event("input", { bubbles: true });
-                realInput.dispatchEvent(event);
-            });
-            
-            // Handle pressing Enter in the custom input
-            customInput.addEventListener("keypress", function(e) {
-                if (e.key === "Enter" && this.value.trim() !== "") {
-                    realSendButton.click();
-                }
-            });
-            
-            // Handle clicking the custom send button
-            customSendButton.addEventListener("click", function() {
-                if (customInput.value.trim() !== "") {
-                    realSendButton.click();
-                }
-            });
-            
-            // Scroll to bottom of chat
-            const chatBody = document.getElementById("chat-body");
-            chatBody.scrollTop = chatBody.scrollHeight;
-        </script>
-        """, unsafe_allow_html=True)
-        
-        # Handle sending and receiving messages
-        if (send_button or user_input) and user_input and not st.session_state.thinking:
-            # Get current time
-            current_time = datetime.now().strftime("%I:%M %p")
-            
-            # Add user message to history
-            st.session_state.messages.append({
-                "role": "user",
-                "content": user_input,
-                "time": current_time
-            })
+        # Process user input when send is clicked or Enter is pressed
+        if (send_button or user_input) and user_input and not st.session_state.get("thinking", False):
+            # Add user message to chat history
+            st.session_state.messages.append({"role": "user", "content": user_input})
             
             # Set thinking state
             st.session_state.thinking = True
             
-            # Rerun to display user message and thinking indicator
+            # Clear the input by forcing a rerun
             st.rerun()
         
-        # Process the thinking state
-        if st.session_state.thinking:
+        # Process the thinking state if active
+        if st.session_state.get("thinking", False):
             # Get the last user message
             user_message = st.session_state.messages[-1]["content"]
             
@@ -951,7 +701,6 @@ def main():
             claude_messages = [
                 {"role": msg["role"], "content": msg["content"]} 
                 for msg in st.session_state.messages
-                if msg["role"] in ["user", "assistant"] and not msg.get("examples", False)
             ]
             
             # Prepare system prompt
@@ -985,14 +734,10 @@ def main():
             # Query Claude with enhanced prompt
             response = query_claude(user_message, claude_messages[-10:], system_prompt)
             
-            # Get current time for the response
-            current_time = datetime.now().strftime("%I:%M %p")
-            
             # Add response to message history
             st.session_state.messages.append({
                 "role": "assistant",
-                "content": response,
-                "time": current_time
+                "content": response
             })
             
             # Turn off thinking state
@@ -1000,6 +745,44 @@ def main():
             
             # Rerun to update the UI
             st.rerun()
+
+        # Add JavaScript to auto-scroll to the bottom of chat and focus the input
+        st.markdown("""
+        <script>
+            // Function to scroll chat to bottom
+            function scrollChatToBottom() {
+                const chatContainer = document.querySelector('.chat-container');
+                if (chatContainer) {
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                }
+            }
+            
+            // Set focus to the input field
+            function focusInput() {
+                const inputField = document.querySelector('input[data-testid="stTextInput"]');
+                if (inputField) {
+                    inputField.focus();
+                }
+            }
+            
+            // Run these functions after the page loads
+            window.addEventListener('load', function() {
+                scrollChatToBottom();
+                focusInput();
+            });
+            
+            // Also run them after any content changes
+            const observer = new MutationObserver(function() {
+                scrollChatToBottom();
+            });
+            
+            // Start observing the chat container
+            const chatContainer = document.querySelector('.chat-container');
+            if (chatContainer) {
+                observer.observe(chatContainer, { childList: true, subtree: true });
+            }
+        </script>
+        """, unsafe_allow_html=True)
     # Insights Tab
     with tabs[2]:
         st.header("Food Recall Insights")
