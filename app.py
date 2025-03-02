@@ -1,15 +1,8 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import json
-import requests
+import anthropic
+import plotly.express as px
 from datetime import datetime
-import matplotlib.pyplot as plt
-import seaborn as sns
-from scipy.stats import chi2_contingency
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import LabelEncoder
-
 
     # interactive plotly charts
 def plotly_chart(fig, key=None, use_container_width=True):
@@ -148,148 +141,11 @@ def load_data():
     except Exception as e:
         st.error(f"Error loading Excel file: {str(e)}")
         return pd.DataFrame()
-
-# ניתוח מתקדם של הנתונים
-@st.cache_data
-def analyze_data(df):
-    insights = {}
-    
-    # זיהוי מגמות לאורך זמן
-    if 'Year' in df.columns and 'Recall Category' in df.columns:
-        yearly_trends = df.groupby('Year')['Recall Category'].value_counts().unstack().fillna(0)
-        if not yearly_trends.empty and len(yearly_trends) > 1:
-            insights["trends"] = yearly_trends.pct_change().mean().dropna().to_dict()
-    
-    # זיהוי קורלציות בין משתנים
-    correlations = {}
-    categorical_cols = ['Food Category', 'Company Size', 'Season']
-    categorical_cols = [col for col in categorical_cols if col in df.columns]
-    
-    target_cols = ['Recall Category', 'Product Classification']
-    target_cols = [col for col in target_cols if col in df.columns]
-    
-    for col1 in categorical_cols:
-        for col2 in target_cols:
-            if col1 in df.columns and col2 in df.columns:
-                contingency = pd.crosstab(df[col1].fillna('Unknown'), 
-                                         df[col2].fillna('Unknown'))
-                if contingency.shape[0] > 1 and contingency.shape[1] > 1:
-                    try:
-                        chi2, p, _, _ = chi2_contingency(contingency)
-                        if p < 0.05:  # מובהק סטטיסטית
-                            correlations[f"{col1}_vs_{col2}"] = float(p)
-                    except:
-                        pass
-    insights["correlations"] = correlations
-    
-    # זיהוי מקרים חריגים לפי קטגוריה
-    outliers = {}
-    if 'Food Category' in df.columns and 'Recall Category' in df.columns:
-        for category in df['Food Category'].dropna().unique():
-            category_data = df[df['Food Category'] == category]
-            common_reasons = category_data['Recall Category'].value_counts().head(3).to_dict()
-            outliers[category] = common_reasons
-        insights["category_specific_patterns"] = outliers
-    
-    return insights
-
-@st.cache_data
-def generate_proactive_insights(df):
-    insights = []
-    
-    # בדיקה שהעמודות הנדרשות קיימות
-    if 'Year' not in df.columns or 'Recall Category' not in df.columns:
-        return ["No year or recall category data available for trend analysis"]
-    
-    # חיפוש מגמות עולות
-    years = df['Year'].dropna().unique()
-    if len(years) < 4:  # אין מספיק שנים לניתוח מגמות
-        return ["Not enough years in the dataset for trend analysis"]
-    
-    max_year = df['Year'].max()
-    recent_data = df[df['Year'] >= max_year - 2]
-    prev_period = df[(df['Year'] < max_year - 2) & (df['Year'] >= max_year - 4)]
-    
-    if len(recent_data) == 0 or len(prev_period) == 0:
-        return ["Not enough data in the comparison periods"]
-    
-    emerging_issues = recent_data['Recall Category'].value_counts().head(3)
-    prev_issues = prev_period['Recall Category'].value_counts()
-    
-    # השוואת בעיות עכשוויות למגמות קודמות
-    for issue, count in emerging_issues.items():
-        if issue in prev_issues:
-            percent_change = ((count / len(recent_data)) - (prev_issues[issue] / len(prev_period))) * 100
-            if percent_change > 20:  # עלייה משמעותית
-                insights.append(f"Rising concern: {issue} recalls have increased by {percent_change:.1f}% in recent years")
-    
-    # זיהוי קטגוריות מזון בעייתיות
-    if 'Food Category' in df.columns and 'Product Classification' in df.columns:
-        risk_data = df.dropna(subset=['Food Category', 'Product Classification'])
-        if not risk_data.empty:
-            high_risk_categories = risk_data.groupby('Food Category')['Product Classification'].apply(
-                lambda x: (x == 'Class I').mean() if 'Class I' in x.values else 0  # אחוז הריקולים המסוכנים ביותר
-            ).sort_values(ascending=False).head(3)
-            
-            for category, risk_percent in high_risk_categories.items():
-                if risk_percent > 0.5:  # יותר מ-50% ריקולים מסוכנים
-                    insights.append(f"High-risk category: {category} has {risk_percent:.1%} Class I (most severe) recalls")
-    
-    return insights
-
-def query_specific_data(user_question, df):
-    results = {}
-    
-    # בדיקת שאלות לגבי מוצרי חלב
-    if "dairy" in user_question.lower() or "חלב" in user_question:
-        if 'Food Category' in df.columns:
-            dairy_data = df[df['Food Category'].str.contains('Dairy|חלב|דאירי', case=False, na=False)]
-            if not dairy_data.empty:
-                results["dairy_recalls_count"] = len(dairy_data)
-                if 'Recall Category' in df.columns:
-                    results["common_reasons"] = dairy_data['Recall Category'].value_counts().head(5).to_dict()
-                if 'Year' in df.columns:
-                    results["trend"] = dairy_data.groupby('Year').size().to_dict()
-                if 'Product Classification' in df.columns:
-                    results["severity_breakdown"] = dairy_data['Product Classification'].value_counts().to_dict()
-    
-    # בדיקת שאלות לגבי בקטריות ספציפיות
-    bacteria_terms = {
-        "e.coli": ["e.coli", "e. coli", "אי קולי"],
-        "listeria": ["listeria", "ליסטריה"],
-        "salmonella": ["salmonella", "סלמונלה"]
-    }
-    
-    for bacteria, terms in bacteria_terms.items():
-        if any(term in user_question.lower() for term in terms):
-            if 'Detailed Recall Category' in df.columns:
-                bacteria_data = df[df['Detailed Recall Category'].str.contains('|'.join(terms), case=False, na=False)]
-                if not bacteria_data.empty:
-                    results[f"{bacteria}_recalls_count"] = len(bacteria_data)
-                    if 'Year' in df.columns:
-                        results[f"{bacteria}_yearly_trend"] = bacteria_data.groupby('Year').size().to_dict()
-                    if 'Season' in df.columns:
-                        results[f"{bacteria}_seasonal"] = bacteria_data.groupby('Season').size().to_dict()
-                    if 'Food Category' in df.columns:
-                        results[f"{bacteria}_common_foods"] = bacteria_data['Food Category'].value_counts().head(5).to_dict()
-    
-    # בדיקת שאלות לגבי אלרגנים
-    if "allergen" in user_question.lower() or "allergy" in user_question.lower() or "אלרגן" in user_question or "אלרגיה" in user_question:
-        if 'Recall Category' in df.columns:
-            allergen_data = df[df['Recall Category'].str.contains('Allergen|אלרגן', case=False, na=False)]
-            if not allergen_data.empty:
-                results["allergen_recalls_count"] = len(allergen_data)
-                if 'Detailed Recall Category' in df.columns:
-                    results["allergen_types"] = allergen_data['Detailed Recall Category'].value_counts().head(5).to_dict()
-                if 'Food Category' in df.columns:
-                    results["allergen_common_foods"] = allergen_data['Food Category'].value_counts().head(5).to_dict()
-    
-    return results
         
 # query_claude
-def query_claude(user_message, conversation_history=None, system_prompt=None):
+def query_claude(prompt, conversation_history=None, system_prompt=None):
     try:
-        # נסה לקבל את מפתח ה-API מהסודות
+        # Get API key from secrets
         if "CLAUDE_API_KEY" in st.secrets:
             api_key = st.secrets["CLAUDE_API_KEY"]
         elif "anthropic" in st.secrets and "CLAUDE_API_KEY" in st.secrets["anthropic"]:
@@ -297,115 +153,35 @@ def query_claude(user_message, conversation_history=None, system_prompt=None):
         else:
             return "API key not found in Streamlit secrets."
         
-        # טען את הנתונים
-        df = load_data()
-        
-        # הפק תובנות מתקדמות מהנתונים
-        data_insights = analyze_data(df)
-        proactive_insights = generate_proactive_insights(df)
-        
-        # בצע ניתוח ספציפי לשאלת המשתמש
-        user_specific_data = query_specific_data(user_message, df)
-        
-        # זהה את רמת המומחיות של המשתמש
-        user_expertise = identify_user_expertise(conversation_history or [])
-        
-        # הגדרת ידע מקצועי בתחום בטיחות המזון
-        food_safety_knowledge = """
-        EXPERT DOMAIN KNOWLEDGE:
-        1. FDA Recall Classifications:
-           - Class I: Dangerous or defective products that could cause serious health problems
-           - Class II: Products that might cause temporary health problem, or slight threat
-           - Class III: Products that are unlikely to cause any adverse health reaction, but violate regulations
-
-        2. Common Contaminants Impact:
-           - Listeria monocytogenes: Particularly dangerous for pregnant women, elderly, causes listeriosis
-           - E. coli: Can cause severe stomach cramps, bloody diarrhea, and vomiting
-           - Salmonella: Causes diarrhea, fever, and abdominal cramps, symptoms develop 12-72 hours after infection
-
-        3. Allergen Regulations:
-           - Major food allergens require specific labeling (milk, eggs, fish, shellfish, tree nuts, peanuts, wheat, soybeans)
-           - Undeclared allergens are the leading cause of recalls in processed foods
-           
-        4. Supply Chain Implications:
-           - Widespread distribution patterns indicate broader contamination risk
-           - Limited distribution may indicate localized manufacturing issues
-           - Multiple products from same manufacturer suggest systemic quality control problems
-        """
-        
-        # בנה פרומפט מערכת משופר
-        enhanced_system_prompt = f"""
-        You are Contamio, a specialized food safety assistant focused on analyzing food recall data and identifying potential risks.
-
-        IMPORTANT GUIDELINES:
-        1. Focus on helping the user understand specific food safety risks based on the recall database.
-        2. Adjust your response length based on the complexity of the query - be concise for simple questions, more thorough for complex ones.
-        3. When appropriate, ask clarifying questions to better understand the user's specific concerns.
-        4. Include relevant statistics from the recall database to support your insights.
-        5. Prioritize practical information about food safety risks, prevention, and patterns in recalls.
-        6. Break down complex information into clear, structured explanations.
-        7. When relevant, explain the implications of recall patterns for consumers.
-
-        DATABASE CONTEXT:
-        - You have access to a food recall database with {len(df)} records.
-        - The database includes information about product types, companies, recall reasons, and dates.
-        - Top food categories: {', '.join(df['Food Category'].value_counts().head(5).index.tolist())}
-        - Common recall reasons: {', '.join(df['Recall Category'].value_counts().head(5).index.tolist())}
-        - Years covered: {df['Year'].min()} to {df['Year'].max()}
-        
-        ENHANCED DATABASE ANALYSIS:
-        - Data Correlations: {json.dumps(data_insights.get('correlations', {}))}
-        - Category-Specific Patterns: {json.dumps(data_insights.get('category_specific_patterns', {}))}
-        - Trend Insights: {json.dumps(data_insights.get('trends', {}))}
-        
-        PROACTIVE INSIGHTS:
-        {json.dumps(proactive_insights)}
-        
-        USER-SPECIFIC DATA:
-        {json.dumps(user_specific_data) if user_specific_data else "No specific data for this query."}
-        
-        USER EXPERTISE LEVEL:
-        {user_expertise}. Adjust your technical depth accordingly.
-        
-        {food_safety_knowledge}
-        
-        SPECIAL INSTRUCTIONS:
-        - If the user's question relates to a specific food category, provide targeted statistics about recalls in that category.
-        - If the user asks about trends, analyze temporal patterns in the data.
-        - If the user asks about risks, focus on the most common and severe contamination issues.
-        - If the user's question is too broad, ask a follow-up question to narrow the focus.
-        - Always explain the practical implications for food safety.
-        
-        If the user writes in Hebrew, reply in Hebrew. Otherwise, reply in English.
-        """
-        
-        # השתמש בפרומפט המערכת המורחב או בפרומפט שהועבר
-        final_system_prompt = enhanced_system_prompt if system_prompt is None else system_prompt
-        
-        # הכן כותרות לבקשה
+        # Prepare headers for direct API call
         headers = {
             "x-api-key": api_key,
             "anthropic-version": "2023-06-01",
             "content-type": "application/json"
         }
         
-        # הכן הודעות
+        # Prepare messages
         messages = []
         if conversation_history:
             messages.extend(conversation_history)
         
-        # הוסף את ההודעה הנוכחית
-        messages.append({"role": "user", "content": user_message})
+        # Add the current prompt
+        messages.append({"role": "user", "content": prompt})
         
-        # הכן את גוף הבקשה
+        # Prepare request body
         request_body = {
             "model": "claude-3-opus-20240229",
-            "max_tokens": 1500,
-            "messages": messages,
-            "system": final_system_prompt
+            "max_tokens": 1500,  # Increased for more flexible response length
+            "messages": messages
         }
         
-        # בצע קריאה ישירה ל-API באמצעות requests
+        # Add system prompt if provided
+        if system_prompt:
+            request_body["system"] = system_prompt
+        else:
+            request_body["system"] = "You are Contamio, a food safety analysis assistant focused on analyzing food recall data in the USA."
+        
+        # Make direct API call using requests
         import requests
         response = requests.post(
             "https://api.anthropic.com/v1/messages",
@@ -413,7 +189,7 @@ def query_claude(user_message, conversation_history=None, system_prompt=None):
             json=request_body
         )
         
-        # עבד את התגובה
+        # Process response
         if response.status_code == 200:
             return response.json()["content"][0]["text"]
         else:
@@ -421,29 +197,6 @@ def query_claude(user_message, conversation_history=None, system_prompt=None):
     
     except Exception as e:
         return f"Error: {type(e).__name__}: {str(e)}"
-
-# פונקציה לזיהוי רמת המומחיות של המשתמש
-def identify_user_expertise(conversation_history):
-    # ניתוח שאלות קודמות לזיהוי רמת המומחיות
-    technical_terms = ['staphylococcus', 'aflatoxin', 'noro', 'listeria', 'clostridium', 
-                      'microbial contamination', 'detection threshold', 'מונוציטוגנס']
-    regulatory_terms = ['CFR', 'FDA', 'USDA', 'compliance', 'regulation', 'enforcement', 'תקן', 'תקנה', 'חוק']
-    
-    technical_count = 0
-    regulatory_count = 0
-    
-    for message in conversation_history:
-        if message["role"] == "user":
-            content = message["content"].lower()
-            technical_count += sum(1 for term in technical_terms if term.lower() in content)
-            regulatory_count += sum(1 for term in regulatory_terms if term.lower() in content)
-    
-    if technical_count > 2 or regulatory_count > 2:
-        return "expert"
-    elif technical_count > 0 or regulatory_count > 0:
-        return "intermediate"
-    else:
-        return "general"
         
 # Function to generate food recall insights
 def generate_insights(df, aspect):
@@ -1074,6 +827,10 @@ def main():
         ### How It Works
         Contamio uses Claude AI to analyze food recall data and generate insights. The platform helps identify patterns in food recalls, allowing for better understanding of food safety risks.
         """)
+
+# Run the app
+if __name__ == "__main__":
+    main()
 
 # Run the app
 if __name__ == "__main__":
