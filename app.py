@@ -600,27 +600,91 @@ def main():
         st.dataframe(display_data[display_columns].head(50), use_container_width=True)
     
     # Ask Contamio Tab
+    # Ask Contamio Tab
     with tabs[1]:
         st.header("Ask Contamio about Food Recalls")
-        
+    
+        # Custom CSS for chat bubbles and layout
+        st.markdown("""
+        <style>
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 70vh;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 10px;
+        }
+        .message-container {
+            display: flex;
+            margin-bottom: 10px;
+            width: 100%;
+        }
+        .user-container {
+            justify-content: flex-end;
+        }
+        .assistant-container {
+            justify-content: flex-start;
+        }
+        .message-bubble {
+            padding: 10px 15px;
+            border-radius: 18px;
+            max-width: 75%;
+            word-wrap: break-word;
+        }
+        .user-bubble {
+            background-color: white;
+            border: 1px solid #e0e0e0;
+            color: #333;
+            border-top-right-radius: 5px;
+        }
+        .assistant-bubble {
+            background-color: #e3f2fd;
+            color: #333;
+            border-top-left-radius: 5px;
+        }
+        .chat-input-container {
+            position: sticky;
+            bottom: 0;
+            background-color: white;
+            padding: 10px;
+            border-radius: 10px;
+            box-shadow: 0px -2px 5px rgba(0,0,0,0.05);
+        }
+        .thinking-bubble {
+            background-color: #e8eaf6;
+            color: #5c6bc0;
+            font-style: italic;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+    
         # Initialize chat history if it doesn't exist
         if "chat_history" not in st.session_state:
             st.session_state.chat_history = []
     
+        # Create chat container
+        st.markdown('<div class="chat-container" id="chat-container">', unsafe_allow_html=True)
+    
         # Display initial message if chat is empty
         if not st.session_state.chat_history:
-            with st.chat_message("assistant"):
-                st.markdown("""
-                Hello! I'm Contamio, your food safety assistant. I can help you understand food recall data and identify potential risks.
-            
-                You can ask me questions like:
-                - What are the most common reasons for dairy product recalls?
-                - Are there seasonal patterns in E. coli contamination?
-                - What food categories have the highest recall rates?
-                - What should I know about allergen-related recalls?
-            
-                I'll analyze the data to help you understand food safety risks and trends.
-                """)
+            st.markdown("""
+            <div class="message-container assistant-container">
+                <div class="message-bubble assistant-bubble">
+                    Hello! I'm Contamio, your food safety assistant. I can help you understand food recall data and identify potential risks.
+                    <br><br>
+                    You can ask me questions like:
+                    <br>- What are the most common reasons for dairy product recalls?
+                    <br>- Are there seasonal patterns in E. coli contamination?
+                    <br>- What food categories have the highest recall rates?
+                    <br>- What should I know about allergen-related recalls?
+                    <br><br>
+                    I'll analyze the data to help you understand food safety risks and trends.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
         
             # Add this welcome message to history
             st.session_state.chat_history.append({
@@ -630,69 +694,87 @@ def main():
     
         # Display chat messages
         for message in st.session_state.chat_history:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
+            bubble_class = "user-bubble" if message["role"] == "user" else "assistant-bubble"
+            container_class = "user-container" if message["role"] == "user" else "assistant-container"
+        
+            st.markdown(f"""
+            <div class="message-container {container_class}">
+                <div class="message-bubble {bubble_class}">
+                    {message["content"]}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
     
-        # Chat input
-        user_input = st.chat_input("Ask about food recalls...")
+        # Close the chat container
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+        # Chat input container - always at the bottom
+        st.markdown('<div class="chat-input-container">', unsafe_allow_html=True)
+        user_input = st.text_input("Ask about food recalls...", key="chat_input")
+        st.markdown('</div>', unsafe_allow_html=True)
     
         if user_input:
             # Add user message to chat history
             st.session_state.chat_history.append({"role": "user", "content": user_input})
         
-            # Display user message immediately
-            with st.chat_message("user"):
-                st.markdown(user_input)
-            
-            # Show "thinking" message
-            with st.chat_message("assistant"):
-                thinking_placeholder = st.empty()
-                thinking_placeholder.markdown("_Analyzing food recall data..._")
-            
-                # Format conversation history for Claude
-                claude_messages = [
-                    {"role": msg["role"], "content": msg["content"]} 
-                    for msg in st.session_state.chat_history
-                    if msg["role"] in ["user", "assistant"]
-                ]
-            
-                # Prepare enhanced system prompt for Claude
-                system_prompt = f"""
-                You are Contamio, a specialized food safety assistant focused on analyzing food recall data and identifying potential risks.
+            # Add thinking message (will be removed after processing)
+            st.session_state.thinking = True
+        
+            # Format conversation history for Claude
+            claude_messages = [
+                {"role": msg["role"], "content": msg["content"]} 
+                for msg in st.session_state.chat_history
+                if msg["role"] in ["user", "assistant"]
+            ]
+        
+            # Prepare enhanced system prompt for Claude
+            system_prompt = f"""
+            You are Contamio, a specialized food safety assistant focused on analyzing food recall data and identifying potential risks.
 
-                IMPORTANT GUIDELINES:
-                1. Focus on helping the user understand specific food safety risks based on the recall database.
-                2. Adjust your response length based on the complexity of the query - be concise for simple questions, more thorough for complex ones.
-                3. When appropriate, ask clarifying questions to better understand the user's specific concerns.
-                4. Include relevant statistics from the recall database to support your insights.
-                5. Prioritize practical information about food safety risks, prevention, and patterns in recalls.
-                6. Break down complex information into clear, structured explanations.
-                7. When relevant, explain the implications of recall patterns for consumers.
+            IMPORTANT GUIDELINES:
+            1. Focus on helping the user understand specific food safety risks based on the recall database.
+            2. Adjust your response length based on the complexity of the query - be concise for simple questions, more thorough for complex ones.
+            3. When appropriate, ask clarifying questions to better understand the user's specific concerns.
+            4. Include relevant statistics from the recall database to support your insights.
+            5. Prioritize practical information about food safety risks, prevention, and patterns in recalls.
+            6. Break down complex information into clear, structured explanations.
+            7. When relevant, explain the implications of recall patterns for consumers.
 
-                DATABASE CONTEXT:
-                - You have access to a food recall database with {len(df)} records.
-                - The database includes information about product types, companies, recall reasons, and dates.
-                - Top food categories: {', '.join(df['Food Category'].value_counts().head(5).index.tolist())}
-                - Common recall reasons: {', '.join(df['Recall Category'].value_counts().head(5).index.tolist())}
-                - Years covered: {df['Year'].min()} to {df['Year'].max()}
-            
-                SPECIAL INSTRUCTIONS:
-                - If the user's question relates to a specific food category, provide targeted statistics about recalls in that category.
-                - If the user asks about trends, analyze temporal patterns in the data.
-                - If the user asks about risks, focus on the most common and severe contamination issues.
-                - If the user's question is too broad, ask a follow-up question to narrow the focus.
-                - Always explain the practical implications for food safety.
-                """
-            
-                # Query Claude with enhanced prompt
-                response = query_claude(user_input, claude_messages[-10:], system_prompt)
-            
-                # Replace thinking message with actual response
-                thinking_placeholder.markdown(response)
+            DATABASE CONTEXT:
+            - You have access to a food recall database with {len(df)} records.
+            - The database includes information about product types, companies, recall reasons, and dates.
+            - Top food categories: {', '.join(df['Food Category'].value_counts().head(5).index.tolist())}
+            - Common recall reasons: {', '.join(df['Recall Category'].value_counts().head(5).index.tolist())}
+            - Years covered: {df['Year'].min()} to {df['Year'].max()}
+        
+            SPECIAL INSTRUCTIONS:
+            - If the user's question relates to a specific food category, provide targeted statistics about recalls in that category.
+            - If the user asks about trends, analyze temporal patterns in the data.
+            - If the user asks about risks, focus on the most common and severe contamination issues.
+            - If the user's question is too broad, ask a follow-up question to narrow the focus.
+            - Always explain the practical implications for food safety.
+            """
+        
+            # Query Claude with enhanced prompt
+            response = query_claude(user_input, claude_messages[-10:], system_prompt)
         
             # Add assistant response to chat history
             st.session_state.chat_history.append({"role": "assistant", "content": response})
+            st.session_state.thinking = False
+        
+            # Rerun to update the chat display
+            st.rerun()
     
+        # Display thinking animation if processing
+        if st.session_state.get("thinking", False):
+            st.markdown("""
+            <div class="message-container assistant-container">
+                <div class="message-bubble thinking-bubble">
+                    Analyzing food recall data...
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
     # Insights Tab
     with tabs[2]:
         st.header("Food Recall Insights")
