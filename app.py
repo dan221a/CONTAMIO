@@ -122,29 +122,20 @@ def load_data():
 
 def query_claude(prompt, conversation_history=None):
     try:
-        # Try multiple approaches to get the API key
-        api_key = None
-        
-        # First try direct access
+        # Get API key from secrets
         if "CLAUDE_API_KEY" in st.secrets:
             api_key = st.secrets["CLAUDE_API_KEY"]
-        
-        # Next try nested dictionary approach
         elif "anthropic" in st.secrets and "CLAUDE_API_KEY" in st.secrets["anthropic"]:
             api_key = st.secrets["anthropic"]["CLAUDE_API_KEY"]
+        else:
+            return "API key not found in Streamlit secrets."
         
-        # If we still don't have a key, show detailed error
-        if not api_key:
-            error_msg = "Claude API key not found in Streamlit secrets. Please check your secrets.toml configuration."
-            return error_msg
-        
-        # Try initializing the client with minimal parameters
-        try:
-            # Create client with only the API key, no extra parameters
-            client = anthropic.Anthropic(api_key=api_key)
-        except Exception as client_error:
-            error_detail = f"Client initialization error: {type(client_error).__name__}: {str(client_error)}"
-            return error_detail
+        # Prepare headers for direct API call
+        headers = {
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json"
+        }
         
         # Prepare messages
         messages = []
@@ -154,23 +145,31 @@ def query_claude(prompt, conversation_history=None):
         # Add the current prompt
         messages.append({"role": "user", "content": prompt})
         
-        # Make the API call with detailed error handling
-        try:
-            response = client.messages.create(
-                model="claude-3-opus-20240229",
-                max_tokens=1024,
-                system="You are Contamio, a food safety analysis assistant focused on analyzing food recall data in the USA. Provide clear, concise insights about food recall trends, patterns, and potential consumer risks.",
-                messages=messages
-            )
-            return response.content[0].text
-        except Exception as e:
-            error_detail = f"Error calling Claude API: {type(e).__name__}: {str(e)}"
-            return error_detail
-            
+        # Prepare request body
+        request_body = {
+            "model": "claude-3-opus-20240229",
+            "max_tokens": 1024,
+            "system": "You are Contamio, a food safety analysis assistant focused on analyzing food recall data in the USA. Provide clear, concise insights about food recall trends, patterns, and potential consumer risks.",
+            "messages": messages
+        }
+        
+        # Make direct API call using requests
+        import requests
+        response = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers=headers,
+            json=request_body
+        )
+        
+        # Process response
+        if response.status_code == 200:
+            return response.json()["content"][0]["text"]
+        else:
+            return f"API Error: {response.status_code} - {response.text}"
+    
     except Exception as e:
-        error_detail = f"General error in query_claude function: {type(e).__name__}: {str(e)}"
-        return error_detail
-
+        return f"Error: {type(e).__name__}: {str(e)}"
+        
 # Function to generate food recall insights
 def generate_insights(df, aspect):
     if df.empty:
