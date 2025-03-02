@@ -5,20 +5,20 @@ import time
 import os
 import anthropic
 
-# Set page configuration
+# הגדרת תצורת העמוד
 st.set_page_config(
-    page_title="Contamio Chat",
+    page_title="צ'אט Contamio",
     page_icon="💬",
     layout="centered"
 )
 
-# Load API key from environment or secrets
+# טעינת מפתח API מהסביבה או מהסודות
 API_KEY = st.secrets.get("CLAUDE_API_KEY", os.environ.get("CLAUDE_API_KEY", ""))
 
-# Custom CSS for chat interface
+# CSS מותאם אישית לממשק הצ'אט
 st.markdown("""
 <style>
-    /* Remove padding and margin from the main container */
+    /* הסרת ריפוד ושוליים מהמיכל הראשי */
     .block-container {
         padding-top: 2rem;
         padding-bottom: 2rem;
@@ -27,20 +27,21 @@ st.markdown("""
         margin-top: 0;
     }
     
-    /* Chat container */
+    /* מיכל הצ'אט */
     .chat-container {
         border-radius: 10px;
         background-color: #f9f9f9;
         overflow: hidden;
         margin-bottom: 1rem;
         border: 1px solid #eee;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
     }
     
-    /* Chat header */
+    /* כותרת הצ'אט */
     .chat-header {
         background-color: #1E88E5;
         color: white;
-        padding: 10px;
+        padding: 12px 15px;
         font-weight: bold;
         display: flex;
         align-items: center;
@@ -50,16 +51,17 @@ st.markdown("""
         margin-right: 10px;
     }
     
-    /* Messages container */
+    /* מיכל ההודעות */
     .messages-container {
         height: 400px;
         overflow-y: auto;
         padding: 15px;
         display: flex;
         flex-direction: column;
+        background-color: #f5f8fa;
     }
     
-    /* Messages */
+    /* הודעות */
     .message {
         border-radius: 18px;
         padding: 10px 15px;
@@ -75,6 +77,7 @@ st.markdown("""
         border-bottom-right-radius: 4px;
         text-align: right;
         direction: rtl;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     }
     
     .bot-message {
@@ -85,17 +88,19 @@ st.markdown("""
         border: 1px solid #e0e0e0;
         text-align: right;
         direction: rtl;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
     }
     
-    /* Chat input area */
+    /* אזור קלט הצ'אט */
     .chat-input {
         display: flex;
         padding: 10px;
         background-color: white;
         border-top: 1px solid #eee;
+        align-items: center;
     }
     
-    /* Loading animation */
+    /* אנימציית טעינה */
     .loading {
         display: flex;
         align-items: center;
@@ -104,7 +109,7 @@ st.markdown("""
     }
     
     .loading-dot {
-        background-color: #bbb;
+        background-color: #1E88E5;
         border-radius: 50%;
         width: 8px;
         height: 8px;
@@ -126,24 +131,94 @@ st.markdown("""
         100% { transform: translateY(0); opacity: 0.3; }
     }
     
-    /* Hide Streamlit header and footer */
+    /* דוגמאות לשאלות */
+    .example-questions {
+        margin-top: 1.5rem;
+    }
+    
+    .example-questions h3 {
+        margin-bottom: 1rem;
+        color: #333;
+        font-size: 1.2rem;
+        font-weight: 600;
+    }
+    
+    .example-button {
+        background-color: #f0f2f5;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 8px 12px;
+        text-align: right;
+        direction: rtl;
+        margin-bottom: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        color: #444;
+    }
+    
+    .example-button:hover {
+        background-color: #e3f2fd;
+        border-color: #bbdefb;
+    }
+    
+    /* סגנון כפתור השליחה */
+    .send-button {
+        background-color: #1E88E5;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .send-button:hover {
+        background-color: #1565C0;
+    }
+    
+    .send-button-icon {
+        width: 18px;
+        height: 18px;
+        fill: white;
+    }
+    
+    /* הסתרת כותרת וכותרת תחתונה של Streamlit */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
+    
+    /* תיבת קלט מותאמת */
+    .stTextInput input {
+        border-radius: 20px;
+        border: 1px solid #ddd;
+        padding: 10px 15px;
+        direction: rtl;
+        text-align: right;
+    }
+    
+    .stTextInput input:focus {
+        border-color: #1E88E5;
+        box-shadow: 0 0 0 1px #1E88E5;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# Function to load the Excel data
+# פונקציה לטעינת נתוני האקסל
 @st.cache_data
 def load_data():
     try:
-        # Try to load the data from file
+        # ניסיון לטעון את הנתונים מהקובץ
         df = pd.read_excel("main usa food recall.xlsx")
         return df
     except Exception as e:
-        # Return empty DataFrame if file not found
+        # החזרת DataFrame ריק אם הקובץ לא נמצא
+        st.error(f"שגיאה בטעינת קובץ הנתונים: {str(e)}")
         return pd.DataFrame()
 
-# Function to create Contamio logo SVG
+# פונקציה ליצירת לוגו Contamio ב-SVG
 def get_contamio_logo():
     return """
     <svg width="24" height="24" viewBox="0 0 24 24">
@@ -159,27 +234,35 @@ def get_contamio_logo():
     </svg>
     """
 
-# Function to analyze data with Claude
+# פונקציה ליצירת אייקון שליחה
+def get_send_icon():
+    return """
+    <svg class="send-button-icon" viewBox="0 0 24 24">
+        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+    </svg>
+    """
+
+# פונקציה לניתוח נתונים באמצעות Claude
 def get_claude_response(df, user_message, conversation_history=[]):
     if not API_KEY:
-        # Return a fallback response if no API key is provided
+        # החזרת תשובת ברירת מחדל אם לא סופק מפתח API
         return "אין מפתח API לשירות Claude. אנא הגדר מפתח בהגדרות האפליקציה."
     
     try:
-        # Initialize Claude client
+        # אתחול לקוח Claude
         client = anthropic.Anthropic(api_key=API_KEY)
         
-        # Prepare data summary
+        # הכנת סיכום נתונים
         data_summary = f"מספר רשומות: {len(df)}\n"
         if not df.empty:
             data_summary += f"עמודות: {', '.join(df.columns.tolist())}\n"
             
-            # Add sample data
+            # הוספת דוגמה לנתונים
             data_summary += "\nדוגמה לנתונים (5 רשומות ראשונות):\n"
             data_sample = df.head(5).to_string()
             data_summary += data_sample
         
-        # Create system prompt
+        # יצירת הנחיות מערכת
         system_prompt = f"""
         אתה עוזר מומחה לניתוח נתוני החזרות מזון. המשתמש שואל שאלות לגבי נתוני האקסל שמכילים מידע על החזרות מזון בארה"ב.
 
@@ -195,15 +278,15 @@ def get_claude_response(df, user_message, conversation_history=[]):
         אם המשתמש שואל שאלות שלא קשורות לנתוני החזרות מזון, הסבר בנימוס שאתה יכול לעזור רק בשאלות הקשורות לנתונים אלה.
         """
         
-        # Build message history
+        # בניית היסטוריית ההודעות
         messages = []
         for msg in conversation_history:
             messages.append({"role": msg["role"], "content": msg["content"]})
         
-        # Add the current user message
+        # הוספת ההודעה הנוכחית של המשתמש
         messages.append({"role": "user", "content": user_message})
         
-        # Call Claude API
+        # קריאה ל-API של Claude
         response = client.messages.create(
             model="claude-3-haiku-20240307",
             max_tokens=500,
@@ -216,36 +299,36 @@ def get_claude_response(df, user_message, conversation_history=[]):
     except Exception as e:
         return f"שגיאה בקבלת תשובה מ-Claude: {str(e)}"
 
-# Main app function
+# פונקציית האפליקציה הראשית
 def main():
-    # Load data
+    # טעינת נתונים
     df = load_data()
     
-    # Initialize session state for messages if not already initialized
+    # אתחול מצב הסשן להודעות אם לא אותחל כבר
     if "messages" not in st.session_state:
         st.session_state.messages = [
             {"role": "assistant", "content": "שלום! אני עוזר החזרות המזון של Contamio. כיצד אוכל לעזור לך בניתוח נתוני החזרות?"}
         ]
     
-    # Chat header
+    # כותרת הצ'אט
     st.markdown(f"""
     <div class="chat-container">
         <div class="chat-header">
             <div class="chat-logo">{get_contamio_logo()}</div>
-            <div>Contamio Chat</div>
+            <div>צ'אט Contamio</div>
         </div>
         
         <div class="messages-container" id="chat-messages">
     """, unsafe_allow_html=True)
     
-    # Display chat messages
+    # הצגת הודעות הצ'אט
     for msg in st.session_state.messages:
         if msg["role"] == "user":
             st.markdown(f'<div class="message user-message">{msg["content"]}</div>', unsafe_allow_html=True)
         else:
             st.markdown(f'<div class="message bot-message">{msg["content"]}</div>', unsafe_allow_html=True)
     
-    # Show loading animation if needed
+    # הצגת אנימציית טעינה אם צריך
     if st.session_state.get("loading", False):
         st.markdown("""
         <div class="loading">
@@ -255,13 +338,13 @@ def main():
         </div>
         """, unsafe_allow_html=True)
     
-    # Close messages container
+    # סגירת מיכל ההודעות
     st.markdown("</div>", unsafe_allow_html=True)
     
-    # Chat input
+    # קלט הצ'אט
     st.markdown('<div class="chat-input">', unsafe_allow_html=True)
     
-    # Create columns for input field and send button
+    # יצירת עמודות לשדה הקלט וכפתור השליחה
     col1, col2 = st.columns([5, 1])
     
     with col1:
@@ -271,15 +354,21 @@ def main():
                                   placeholder="הקלד שאלה כאן...")
     
     with col2:
-        send_button = st.button("שלח")
+        send_button = st.markdown(f'<button class="send-button">{get_send_icon()}</button>', unsafe_allow_html=True)
+        send_clicked = st.button("שלח", key="send_button", label_visibility="collapsed")
     
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Close chat container
+    # סגירת מיכל הצ'אט
     st.markdown('</div>', unsafe_allow_html=True)
     
-    # Example questions
-    st.markdown("### דוגמאות לשאלות:")
+    # דוגמאות לשאלות
+    st.markdown("""
+    <div class="example-questions">
+        <h3>דוגמאות לשאלות:</h3>
+    </div>
+    """, unsafe_allow_html=True)
+    
     example_questions = [
         "כמה החזרות מזון יש בסך הכל?",
         "מהן הסיבות הנפוצות ביותר להחזרות?",
@@ -290,47 +379,74 @@ def main():
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.button(example_questions[0]):
-            user_input = example_questions[0]
-            send_button = True
-        if st.button(example_questions[2]):
-            user_input = example_questions[2]
-            send_button = True
+        if st.button(example_questions[0], key="example1", use_container_width=True):
+            st.session_state.user_input = example_questions[0]
+            send_clicked = True
+        if st.button(example_questions[2], key="example3", use_container_width=True):
+            st.session_state.user_input = example_questions[2]
+            send_clicked = True
     
     with col2:
-        if st.button(example_questions[1]):
-            user_input = example_questions[1]
-            send_button = True
-        if st.button(example_questions[3]):
-            user_input = example_questions[3]
-            send_button = True
+        if st.button(example_questions[1], key="example2", use_container_width=True):
+            st.session_state.user_input = example_questions[1]
+            send_clicked = True
+        if st.button(example_questions[3], key="example4", use_container_width=True):
+            st.session_state.user_input = example_questions[3]
+            send_clicked = True
     
-    # Process the user input
-    if send_button and user_input:
-        # Add user message to chat history
-        st.session_state.messages.append({"role": "user", "content": user_input})
+    # עיבוד קלט המשתמש
+    if (send_clicked or (user_input and st.session_state.get("enter_pressed", False))) and not st.session_state.get("loading", False):
+        # קבלת הקלט מהמשתמש
+        input_text = user_input or st.session_state.user_input
         
-        # Set loading state
-        st.session_state.loading = True
-        st.experimental_rerun()
+        if input_text:
+            # הוספת הודעת המשתמש להיסטוריית הצ'אט
+            st.session_state.messages.append({"role": "user", "content": input_text})
+            
+            # הגדרת מצב טעינה
+            st.session_state.loading = True
+            
+            # איפוס קלט המשתמש
+            st.session_state.user_input = ""
+            
+            # הפעלה מחדש לעדכון ממשק המשתמש
+            st.experimental_rerun()
     
-    # If in loading state, process the message
+    # אם במצב טעינה, עיבוד ההודעה
     if st.session_state.get("loading", False):
-        # Get last message
+        # קבלת ההודעה האחרונה
         last_message = st.session_state.messages[-1]["content"]
         
-        # Get Claude response
+        # קבלת תשובה מ-Claude
         conversation_history = st.session_state.messages[:-1]
         response = get_claude_response(df, last_message, conversation_history)
         
-        # Add response to chat history
+        # הוספת התשובה להיסטוריית הצ'אט
         st.session_state.messages.append({"role": "assistant", "content": response})
         
-        # Clear loading state
+        # ניקוי מצב הטעינה
         st.session_state.loading = False
         
-        # Rerun to update UI
+        # הפעלה מחדש לעדכון ממשק המשתמש
         st.experimental_rerun()
+    
+    # JavaScript לטיפול בלחיצה על מקש Enter
+    st.markdown("""
+    <script>
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            window.enterPressed = true;
+            setTimeout(function() {
+                const submitButton = document.querySelector('button[kind="primaryFormSubmit"]');
+                if (submitButton) {
+                    submitButton.click();
+                }
+            }, 10);
+        }
+    });
+    </script>
+    """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
