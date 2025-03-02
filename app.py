@@ -246,7 +246,7 @@ def main():
         if "filtered_data" not in st.session_state:
             st.session_state.filtered_data = df.copy()
             st.session_state.selected_filter = None
-        
+            
         # Add filters sidebar
         st.sidebar.header("Filters")
     
@@ -256,6 +256,24 @@ def main():
             "Select Years", 
             available_years,
             default=available_years
+        )
+    
+        # Month filter (NEW)
+        all_months = ["January", "February", "March", "April", "May", "June", 
+                     "July", "August", "September", "October", "November", "December"]
+        available_months = [month for month in all_months if month in df["Month Name"].unique()]
+        selected_months = st.sidebar.multiselect(
+            "Select Months",
+            available_months,
+            default=[]
+        )
+    
+        # Filter for food categories (NEW)
+        food_categories = sorted(df["Food Category"].dropna().unique().tolist())
+        selected_food_categories = st.sidebar.multiselect(
+            "Food Categories",
+            food_categories,
+            default=[]
         )
     
         # Filter for common recall reasons
@@ -273,11 +291,15 @@ def main():
             contaminants,
             default=[]
         )
-        
+    
         # Apply filters to data
         filtered_data = df.copy()
         if selected_years:
             filtered_data = filtered_data[filtered_data["Year"].isin(selected_years)]
+        if selected_months:
+            filtered_data = filtered_data[filtered_data["Month Name"].isin(selected_months)]
+        if selected_food_categories:
+            filtered_data = filtered_data[filtered_data["Food Category"].isin(selected_food_categories)]
         if selected_reason:
             filtered_data = filtered_data[filtered_data["Recall Category"].isin(selected_reason)]
         if selected_contaminant:
@@ -285,7 +307,7 @@ def main():
     
         # Update session state
         st.session_state.filtered_data = filtered_data
-    
+        
         # Summary metrics in a nice grid with colored cards
         st.markdown("""
         <style>
@@ -385,7 +407,7 @@ def main():
             
                 # Make chart interactive
                 selected_points = plotly_chart(fig, key="recall_categories_chart", use_container_width=True)
-                
+            
                 # Process clicks on the chart
                 if selected_points:
                     selected_category = top_categories.iloc[selected_points["points"][0]["pointIndex"]]["Category"]
@@ -421,23 +443,49 @@ def main():
                     st.session_state.selected_filter = ("Detailed Recall Category", selected_category)
                     st.experimental_rerun()
     
+        # Monthly breakdown chart (NEW)
+        st.subheader("Monthly Analysis")
+    
+        # Create a monthly breakdown chart
+        if "Month Name" in filtered_data.columns:
+            # Create month order mapping
+            month_order = {
+                "January": 1, "February": 2, "March": 3, "April": 4,
+                "May": 5, "June": 6, "July": 7, "August": 8,
+                "September": 9, "October": 10, "November": 11, "December": 12
+            }
+        
+            # Create a temporary column for sorting
+            filtered_data_with_order = filtered_data.copy()
+            filtered_data_with_order["MonthOrder"] = filtered_data_with_order["Month Name"].map(month_order)
+        
+            # Group by month and count recalls
+            month_data = filtered_data_with_order.groupby(["Month Name", "MonthOrder"]).size().reset_index(name="Count")
+            month_data = month_data.sort_values("MonthOrder")
+        
+            fig = px.bar(
+                month_data, 
+                x="Month Name", 
+                y="Count",
+                color="Count",
+                color_continuous_scale="Teal",
+                title="Recalls by Month",
+                category_orders={"Month Name": [m for m in all_months if m in month_data["Month Name"].values]}
+            )
+            fig.update_layout(height=400)
+            st.plotly_chart(fig, use_container_width=True)
+    
         # Second row of visualizations
         viz_col3, viz_col4 = st.columns(2)
     
         with viz_col3:
             # Time series of recalls by month/year
             if "Year" in filtered_data.columns and "Month Name" in filtered_data.columns:
-                # Create month order mapping
-                month_order = {
-                    "January": 1, "February": 2, "March": 3, "April": 4,
-                    "May": 5, "June": 6, "July": 7, "August": 8,
-                    "September": 9, "October": 10, "November": 11, "December": 12
-                }
-            
                 # Prepare time series data
-                filtered_data["MonthOrder"] = filtered_data["Month Name"].map(month_order)
+                filtered_data_with_order = filtered_data.copy()
+                filtered_data_with_order["MonthOrder"] = filtered_data_with_order["Month Name"].map(month_order)
             
-                time_data = filtered_data.groupby(["Year", "Month Name", "MonthOrder"]).size().reset_index(name="Count")
+                time_data = filtered_data_with_order.groupby(["Year", "Month Name", "MonthOrder"]).size().reset_index(name="Count")
                 time_data = time_data.sort_values(["Year", "MonthOrder"])
                 time_data["Date"] = time_data["Year"].astype(str) + "-" + time_data["MonthOrder"].astype(str).str.zfill(2)
             
