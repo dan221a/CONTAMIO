@@ -1,298 +1,217 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
 import os
-from anthropic import Anthropic
+from datetime import datetime
+import anthropic
 
-# הגדרות בסיסיות
+# Set page configuration
 st.set_page_config(
-    page_title="Contamio Chat",
+    page_title="Contamio Food Recall Chatbot",
     page_icon="🔍",
     layout="wide"
 )
 
-# סטייל מינימליסטי
+# Add custom CSS for WhatsApp-like chat interface
 st.markdown("""
 <style>
-    /* סגנון כללי */
-    .main {
-        background-color: #f8f9fa;
-    }
-    
-    /* הסתרת אלמנטים של Streamlit */
-    #MainMenu, footer, header {visibility: hidden;}
-    
-    /* עיצוב מותאם לצ'אט */
-    .chat-message {
-        padding: 1rem;
-        border-radius: 0.5rem;
-        margin-bottom: 1rem;
-        display: flex;
-        flex-direction: column;
-    }
-    
-    .user-message {
-        background-color: #e9f5ff;
-        border-left: 4px solid #2196F3;
-        text-align: right;
-        direction: rtl;
-    }
-    
-    .assistant-message {
-        background-color: #f0f0f0;
-        border-left: 4px solid #9e9e9e;
-        text-align: right;
-        direction: rtl;
-    }
-    
-    /* כותרת */
-    .title-container {
-        display: flex;
-        align-items: center;
-        margin-bottom: 1rem;
-    }
-    
-    .title-text {
-        font-size: 1.5rem;
-        font-weight: bold;
-        margin-right: 0.5rem;
-    }
-    
-    /* כפתורים */
-    .stButton button {
-        background-color: #ffffff;
-        color: #0066cc;
-        border: 1px solid #dddddd;
-        padding: 0.5rem 1rem;
-        border-radius: 0.3rem;
-        text-align: right;
-        direction: rtl;
-        width: 100%;
-    }
-    
-    .stButton button:hover {
-        background-color: #f0f7ff;
-        border-color: #0066cc;
-    }
-    
-    /* תיבת טקסט */
-    .stTextInput input {
-        border-radius: 0.3rem;
-        border: 1px solid #dddddd;
-        padding: 0.5rem;
-        direction: rtl;
-    }
-    
-    /* מיכל הודעות */
-    .messages-container {
-        max-height: 400px;
-        overflow-y: auto;
-        padding-right: 1rem;
-    }
-    
-    /* מידע */
-    .info-box {
-        background-color: #e1f5fe;
-        border-radius: 0.3rem;
-        padding: 1rem;
-        margin-bottom: 1rem;
-        direction: rtl;
-        text-align: right;
-    }
+.chat-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #e5ddd5;
+    border-radius: 10px;
+}
+.user-message {
+    background-color: #dcf8c6;
+    padding: 10px 15px;
+    border-radius: 10px 10px 0 10px;
+    margin: 5px 0;
+    max-width: 70%;
+    margin-left: auto;
+    word-wrap: break-word;
+}
+.bot-message {
+    background-color: white;
+    padding: 10px 15px;
+    border-radius: 10px 10px 10px 0;
+    margin: 5px 0;
+    max-width: 70%;
+    margin-right: auto;
+    word-wrap: break-word;
+}
+.message-time {
+    font-size: 0.7em;
+    color: #999;
+    text-align: right;
+    margin-top: 2px;
+}
+.chat-header {
+    background-color: #00a3e0;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 10px 10px 0 0;
+    display: flex;
+    align-items: center;
+}
+.chat-header img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin-right: 10px;
+}
+.user-input {
+    border-radius: 20px;
+    border: 1px solid #ccc;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# פונקציה לטעינת הנתונים
+# Load the data
 @st.cache_data
 def load_data():
     try:
         df = pd.read_excel("main usa food recall.xlsx")
         return df
     except Exception as e:
-        st.error(f"שגיאה בטעינת הנתונים: {str(e)}")
+        st.error(f"Error loading Excel file: {e}")
         return pd.DataFrame()
 
-# פונקציה לקבלת תשובה מ-Claude
-def get_claude_response(df, question, history):
-    try:
-        # קבלת מפתח API מהגדרות אפליקציה או משתני סביבה
-        api_key = st.secrets.get("ANTHROPIC_API_KEY", os.environ.get("ANTHROPIC_API_KEY", ""))
+# Function to search the recall data
+def search_recalls(query, df):
+    """Search the recall data based on the user query"""
+    if df.empty:
+        return pd.DataFrame()
         
-        if not api_key:
-            return "חסר מפתח API לחיבור ל-Claude. אנא הגדר את המפתח בהגדרות."
-        
-        # יצירת לקוח Anthropic
-        client = Anthropic(api_key=api_key)
-        
-        # הכנת מידע על הדאטה
-        if df.empty:
-            data_info = "אין נתונים זמינים. אנא וודא שקובץ הנתונים נטען כראוי."
+    query = query.lower()
+    
+    # Check for common keywords
+    if 'allergen' in query or 'allergy' in query:
+        if 'milk' in query:
+            results = df[df['Detailed Recall Category'].str.contains('Allergen - Milk', case=False, na=False)]
+        elif 'nut' in query:
+            results = df[df['Detailed Recall Category'].str.contains('Allergen - Nut', case=False, na=False)]
         else:
-            # הכנת תיאור בסיסי של הנתונים
-            columns_info = ", ".join(df.columns.tolist())
-            sample_data = df.head(3).to_string(index=False)
-            total_records = len(df)
-            
-            data_info = f"""
-            מידע על הנתונים:
-            - סך הכל רשומות: {total_records}
-            - עמודות: {columns_info}
-            
-            דוגמה לנתונים:
-            {sample_data}
-            """
-        
-        # בניית הנחיות למודל
-        system_prompt = f"""
-        אתה עוזר מקצועי לניתוח נתוני החזרות מזון. המשתמש מספק לך קובץ אקסל של נתוני החזרות מזון בארה"ב.
-        
-        {data_info}
-        
-        הנחיות:
-        1. ענה רק בעברית
-        2. תן תשובות קצרות וממוקדות
-        3. אם התשובה דורשת ניתוח נתונים, ציין זאת במדויק
-        4. אם אין לך מספיק מידע כדי לענות, ציין זאת בברור
-        
-        תפקידך לעזור למשתמש להבין את הנתונים ולקבל תובנות מהירות.
-        """
-        
-        # בניית שרשרת ההודעות
-        messages = []
-        for msg in history:
-            role = "user" if msg["is_user"] else "assistant"
-            messages.append({"role": role, "content": msg["content"]})
-        
-        # הוספת השאלה הנוכחית
-        messages.append({"role": "user", "content": question})
-        
-        # שליחת הבקשה ל-Claude
-        response = client.messages.create(
-            model="claude-3-haiku-20240307",
-            system=system_prompt,
-            messages=messages,
-            max_tokens=1000,
-        )
-        
-        return response.content[0].text
+            results = df[df['Recall Category'].str.contains('Allergen', case=False, na=False)]
+    elif 'salmonella' in query:
+        results = df[df['Detailed Recall Category'].str.contains('Salmonella', case=False, na=False)]
+    elif 'listeria' in query:
+        results = df[df['Detailed Recall Category'].str.contains('Listeria', case=False, na=False)]
+    else:
+        # General search across multiple columns
+        results = df[
+            df['Product Description'].str.contains(query, case=False, na=False) |
+            df['Recalling Firm Name'].str.contains(query, case=False, na=False) |
+            df['Food Category'].str.contains(query, case=False, na=False) |
+            df['Specific Food Category'].str.contains(query, case=False, na=False)
+        ]
     
-    except Exception as e:
-        return f"שגיאה בתקשורת עם Claude: {str(e)}"
+    return results.head(5)  # Return top 5 results for brevity
 
-# פונקציית האפליקציה הראשית
+# Function to query Claude API
+def query_claude(user_message, conversation_history, search_results):
+    client = anthropic.Anthropic(api_key=os.environ.get("CLAUDE_API_KEY"))
+    
+    if not os.environ.get("CLAUDE_API_KEY"):
+        st.error("Claude API key not found. Please set the CLAUDE_API_KEY environment variable.")
+        return "Sorry, I'm having trouble connecting to my brain right now. Please try again later."
+    
+    # Prepare search context
+    if not search_results.empty:
+        search_context = f"I found {len(search_results)} relevant recalls. Here's the data:\n\n"
+        for i, recall in search_results.iterrows():
+            search_context += f"- Product: {recall.get('Product Description', 'Unknown')}\n"
+            search_context += f"- Company: {recall.get('Recalling Firm Name', 'Unknown')}\n"
+            search_context += f"- Reason: {recall.get('Reason for Recall', 'Unknown')}\n"
+            search_context += f"- Status: {recall.get('Status', 'Unknown')}\n"
+            search_context += f"- Food Category: {recall.get('Food Category', 'Unknown')}\n\n"
+    else:
+        search_context = "No specific recall information found for this query in our database."
+    
+    # Prepare the messages
+    messages = conversation_history + [
+        {"role": "user", "content": f"{user_message}\n\nRECALL_SEARCH_RESULTS: {search_context}"}
+    ]
+    
+    try:
+        response = client.messages.create(
+            model="claude-3-opus-20240229",
+            max_tokens=1024,
+            system="You are Contamio, a food safety assistant focused on food recalls in the USA. You help users find information about recalled food products. Keep your responses conversational and helpful, like a WhatsApp chat. Your responses should be clear, concise, and helpful to consumers concerned about food safety.",
+            messages=messages
+        )
+        return response.content[0].text
+    except Exception as e:
+        st.error(f"Error querying Claude API: {e}")
+        return "Sorry, I'm having trouble connecting to my brain right now. Please try again later."
+
+# Initialize session state for chat history
+if 'messages' not in st.session_state:
+    st.session_state.messages = []
+
 def main():
-    # כותרת מותאמת
-    st.markdown("""
-    <div class="title-container">
-        <div class="title-text">Contamio Chat</div>
-        <div>🔍</div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # טעינת הנתונים
-    df = load_data()
-    
-    # צידי דף - משמאל יהיה הצ'אט, מימין יהיה התוכן הנוסף
-    col1, col2 = st.columns([3, 1])
-    
+    # Display logo and header
+    col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        # הצגת מידע בסיסי על המערכת
+        # Logo SVG
         st.markdown("""
-        <div class="info-box">
-            <h3>מידע על המערכת</h3>
-            <p>מערכת Contamio Chat מאפשרת ניתוח נתוני החזרות מזון באמצעות צ'אט חכם.</p>
-            <p>השתמש בשאלות פשוטות בעברית כדי לנתח את הנתונים.</p>
+        <div class="chat-header">
+            <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MDAgMzAwIj48Y2lyY2xlIGN4PSIyMDAiIGN5PSIxNTAiIHI9IjEyMCIgZmlsbD0ibm9uZSIvPjxjaXJjbGUgY3g9IjIwMCIgY3k9IjE1MCIgcj0iMjAiIGZpbGw9IiMwMGEzZTAiLz48Y2lyY2xlIGN4PSIxMjAiIGN5PSIxNTAiIHI9IjE1IiBmaWxsPSIjMDBhM2UwIi8+PGNpcmNsZSBjeD0iMjgwIiBjeT0iMTUwIiByPSIxNSIgZmlsbD0iIzAwYTNlMCIvPjxjaXJjbGUgY3g9IjE0MCIgY3k9IjkwIiByPSIxMCIgZmlsbD0iIzAwYTNlMCIvPjxjaXJjbGUgY3g9IjI2MCIgY3k9IjkwIiByPSIxMCIgZmlsbD0iIzAwYTNlMCIvPjxjaXJjbGUgY3g9IjE0MCIgY3k9IjIxMCIgcj0iMTAiIGZpbGw9IiMwMGEzZTAiLz48Y2lyY2xlIGN4PSIyNjAiIGN5PSIyMTAiIHI9IjEwIiBmaWxsPSIjMDBhM2UwIi8+PGNpcmNsZSBjeD0iMTcwIiBjeT0iNzAiIHI9IjgiIGZpbGw9IiMwMGEzZTAiLz48Y2lyY2xlIGN4PSIyMzAiIGN5PSI3MCIgcj0iOCIgZmlsbD0iIzAwYTNlMCIvPjxjaXJjbGUgY3g9IjE3MCIgY3k9IjIzMCIgcj0iOCIgZmlsbD0iIzAwYTNlMCIvPjxjaXJjbGUgY3g9IjIzMCIgY3k9IjIzMCIgcj0iOCIgZmlsbD0iIzAwYTNlMCIvPjxjaXJjbGUgY3g9IjIwMCIgY3k9IjUwIiByPSIxMiIgZmlsbD0iIzAwYTNlMCIvPjxjaXJjbGUgY3g9IjIwMCIgY3k9IjI1MCIgcj0iMTIiIGZpbGw9IiMwMGEzZTAiLz48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxMTAiIHI9IjYiIGZpbGw9IiMwMGEzZTAiLz48Y2lyY2xlIGN4PSIzMDAiIGN5PSIxMTAiIHI9IjYiIGZpbGw9IiMwMGEzZTAiLz48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxOTAiIHI9IjYiIGZpbGw9IiMwMGEzZTAiLz48Y2lyY2xlIGN4PSIzMDAiIGN5PSIxOTAiIHI9IjYiIGZpbGw9IiMwMGEzZTAiLz48L3N2Zz4=" alt="Contamio Logo">
+            <div>
+                <h3>Contamio</h3>
+                <p>Food Safety Assistant</p>
+            </div>
         </div>
         """, unsafe_allow_html=True)
         
-        # הצגת מידע על הנתונים
-        if not df.empty:
-            st.markdown(f"""
-            <div class="info-box">
-                <h3>סטטיסטיקה בסיסית</h3>
-                <p>מספר רשומות: {len(df)}</p>
-                <p>מספר עמודות: {len(df.columns)}</p>
-            </div>
-            """, unsafe_allow_html=True)
+    # Load data
+    df = load_data()
+    if df.empty:
+        st.warning("No data loaded. Please check your Excel file.")
+        return
         
-        # דוגמאות לשאלות
-        st.markdown("<h3 style='text-align: right; direction: rtl;'>שאלות לדוגמה</h3>", unsafe_allow_html=True)
-        example_questions = [
-            "כמה החזרות מזון יש בסך הכל?",
-            "מהן הסיבות הנפוצות ביותר להחזרות?",
-            "אילו קטגוריות מזון מוחזרות הכי הרבה?",
-            "מה אחוז ההחזרות מסיווג Class I?"
+    # Chat container
+    st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+    
+    # Display welcome message if chat history is empty
+    if not st.session_state.messages:
+        st.session_state.messages.append({"role": "assistant", "content": "Hello! I'm Contamio, your food safety assistant. I can help you search for food recalls and provide information about food safety. How can I assist you today?"})
+    
+    # Display chat messages
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Chat input
+    user_input = st.chat_input("Type your message here...", key="user_message")
+    
+    # Process user input
+    if user_input:
+        # Add user message to chat history
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        
+        # Display user message
+        with st.chat_message("user"):
+            st.markdown(user_input)
+        
+        # Search the database based on user query
+        search_results = search_recalls(user_input, df)
+        
+        # Format messages for Claude API
+        claude_messages = [
+            {"role": m["role"], "content": m["content"]} 
+            for m in st.session_state.messages[:-1]  # Exclude the last message which we'll format with search results
         ]
         
-        for q in example_questions:
-            if st.button(q, key=f"btn_{q}"):
-                # הוספת השאלה למצב הסשן
-                if "messages" not in st.session_state:
-                    st.session_state.messages = []
-                st.session_state.messages.append({"is_user": True, "content": q})
-                st.session_state.question = q
-                st.session_state.submit = True
-                st.experimental_rerun()
-    
-    with col1:
-        # אתחול מצב
-        if "messages" not in st.session_state:
-            st.session_state.messages = []
-            # הודעת פתיחה
-            welcome_msg = "שלום! אני עוזר החזרות המזון של Contamio. איך אוכל לעזור לך בניתוח נתוני ההחזרות?"
-            st.session_state.messages.append({"is_user": False, "content": welcome_msg})
+        # Get response from Claude API
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                bot_response = query_claude(user_input, claude_messages, search_results)
+                st.markdown(bot_response)
         
-        # הצגת הודעות
-        st.markdown('<div class="messages-container">', unsafe_allow_html=True)
-        for message in st.session_state.messages:
-            if message["is_user"]:
-                st.markdown(f'<div class="chat-message user-message">{message["content"]}</div>', unsafe_allow_html=True)
-            else:
-                st.markdown(f'<div class="chat-message assistant-message">{message["content"]}</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # טופס השאלה
-        with st.form(key="question_form"):
-            user_question = st.text_input(
-                "שאל שאלה:",
-                key="question",
-                placeholder="הקלד את שאלתך כאן...",
-                label_visibility="collapsed"
-            )
-            submit_button = st.form_submit_button("שלח")
-        
-        # טיפול בשליחת השאלה
-        if submit_button and user_question:
-            # הוספת השאלה לרשימת ההודעות
-            st.session_state.messages.append({"is_user": True, "content": user_question})
-            
-            # קבלת תשובה מ-Claude
-            with st.spinner("מקבל תשובה..."):
-                history = st.session_state.messages[:-1]  # כל ההיסטוריה למעט השאלה הנוכחית
-                response = get_claude_response(df, user_question, history)
-            
-            # הוספת התשובה לרשימת ההודעות
-            st.session_state.messages.append({"is_user": False, "content": response})
-            
-            # ריענון הדף
-            st.experimental_rerun()
-        
-        # טיפול בשאלות דוגמה
-        if st.session_state.get("submit", False) and st.session_state.get("question", ""):
-            # קבלת תשובה מ-Claude
-            with st.spinner("מקבל תשובה..."):
-                history = st.session_state.messages[:-1]  # כל ההיסטוריה למעט השאלה הנוכחית
-                response = get_claude_response(df, st.session_state.question, history)
-            
-            # הוספת התשובה לרשימת ההודעות
-            st.session_state.messages.append({"is_user": False, "content": response})
-            
-            # איפוס מצב השליחה
-            st.session_state.submit = False
-            st.session_state.question = ""
-            
-            # ריענון הדף
-            st.experimental_rerun()
+        # Add bot response to chat history
+        st.session_state.messages.append({"role": "assistant", "content": bot_response})
 
 if __name__ == "__main__":
     main()
