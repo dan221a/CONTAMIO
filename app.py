@@ -123,17 +123,43 @@ def load_data():
 # Function to query Claude API
 def query_claude(prompt, conversation_history=None):
     try:
-        # Access API key from Streamlit secrets
+        # Try multiple approaches to get the API key
+        api_key = None
+        
+        # Print debug info (will appear in Streamlit logs)
+        print("Debug: Checking for API key in secrets")
+        
+        # First try direct access
         if "CLAUDE_API_KEY" in st.secrets:
             api_key = st.secrets["CLAUDE_API_KEY"]
+            print("Debug: Found API key directly in secrets")
+        
+        # Next try nested dictionary approach
         elif "anthropic" in st.secrets and "CLAUDE_API_KEY" in st.secrets["anthropic"]:
             api_key = st.secrets["anthropic"]["CLAUDE_API_KEY"]
-        else:
-            st.error("Claude API key not found in Streamlit secrets.")
-            return "Error: API key not configured properly. Please set up your secrets with a CLAUDE_API_KEY."
+            print("Debug: Found API key in st.secrets['anthropic']")
         
-        # Initialize the client
-        client = anthropic.Anthropic(api_key=api_key)
+        # If we still don't have a key, show detailed error
+        if not api_key:
+            error_msg = "Claude API key not found in Streamlit secrets. Please check your secrets.toml configuration."
+            print(f"Debug: {error_msg}")
+            return error_msg
+        
+        # Verify the API key format (should start with "sk-ant")
+        if not api_key.startswith("sk-ant"):
+            error_msg = f"API key format appears incorrect. Keys should start with 'sk-ant'"
+            print(f"Debug: {error_msg}")
+            return error_msg
+            
+        # Try initializing the client with detailed error handling
+        print("Debug: Initializing Anthropic client")
+        try:
+            client = anthropic.Anthropic(api_key=api_key)
+            print("Debug: Client initialized successfully")
+        except Exception as client_error:
+            error_detail = f"Client initialization error: {type(client_error).__name__}: {str(client_error)}"
+            print(f"Debug: {error_detail}")
+            return error_detail
         
         # Prepare messages
         messages = []
@@ -143,18 +169,30 @@ def query_claude(prompt, conversation_history=None):
         # Add the current prompt
         messages.append({"role": "user", "content": prompt})
         
-        # Make the API call
-        response = client.messages.create(
-            model="claude-3-opus-20240229",
-            max_tokens=1024,
-            system="You are Contamio, a food safety analysis assistant focused on analyzing food recall data in the USA. Provide clear, concise insights about food recall trends, patterns, and potential consumer risks. When relevant, suggest preventive measures. Always provide context for your insights so users understand why this information matters.",
-            messages=messages
-        )
-        
-        return response.content[0].text
+        # Make the API call with detailed error handling
+        print("Debug: Making API request to Claude")
+        try:
+            response = client.messages.create(
+                model="claude-3-opus-20240229",
+                max_tokens=1024,
+                system="You are Contamio, a food safety analysis assistant focused on analyzing food recall data in the USA. Provide clear, concise insights about food recall trends, patterns, and potential consumer risks.",
+                messages=messages
+            )
+            print("Debug: API request successful")
+            return response.content[0].text
+        except anthropic.APIError as api_error:
+            error_detail = f"Claude API Error: {str(api_error)}"
+            print(f"Debug: {error_detail}")
+            return error_detail
+        except Exception as e:
+            error_detail = f"Unexpected error when calling Claude API: {type(e).__name__}: {str(e)}"
+            print(f"Debug: {error_detail}")
+            return error_detail
+            
     except Exception as e:
-        st.error(f"Error querying Claude API: {str(e)}")
-        return f"I encountered an error while processing your request: {type(e).__name__}. Please check your API configuration and try again."
+        error_detail = f"General error in query_claude function: {type(e).__name__}: {str(e)}"
+        print(f"Debug: {error_detail}")
+        return error_detail
 
 # Function to generate food recall insights
 def generate_insights(df, aspect):
