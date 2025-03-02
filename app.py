@@ -601,11 +601,10 @@ def main():
     
 
 
-
         # Ask Contamio Tab
     with tabs[1]:
         st.header("Ask Contamio about Food Recalls")
-    
+        
         # Custom CSS for chat bubbles and layout
         st.markdown("""
         <style>
@@ -652,68 +651,36 @@ def main():
             color: #5c6bc0;
             font-style: italic;
         }
-        .input-area {
-            display: flex;
-            margin-top: 10px;
-        }
-        .chat-input {
-            flex-grow: 1;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 20px;
-            margin-right: 10px;
-        }
-        .send-button {
-            background-color: #00a3e0;
-            color: white;
-            border: none;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        .empty-container {
+            display: none;
         }
         </style>
         """, unsafe_allow_html=True)
-    
+        
         # Initialize session states
         if "chat_history" not in st.session_state:
-            st.session_state.chat_history = []
+            st.session_state.chat_history = [{
+                "role": "assistant", 
+                "content": "Hello! I'm Contamio, your food safety assistant. I can help you understand food recall data and identify potential risks."
+            }]
         
         if "thinking" not in st.session_state:
             st.session_state.thinking = False
             
-        if "user_input" not in st.session_state:
-            st.session_state.user_input = ""
-    
-        # Function to handle sending a message
-        def send_message():
-            if st.session_state.widget_input and not st.session_state.thinking:
-                user_message = st.session_state.widget_input
-            
-                # Add to chat history
-                st.session_state.chat_history.append({"role": "user", "content": user_message})
-            
-                # Clear the input box by setting it to empty string
-                st.session_state.widget_input = ""
-            
-                # Set thinking state to true
-                st.session_state.thinking = True
-            
-                # Rerun to show the user message and thinking indicator
-                st.rerun()
-    
-        # Create chat container
-        chat_container = st.container()
-    
-        with chat_container:
-            st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+        # Chat container
+        chat_placeholder = st.empty()
         
-            # Display initial message if chat is empty
-            if not st.session_state.chat_history and not st.session_state.thinking:
-                st.markdown("""
+        # Render chat messages
+        chat_content = '<div class="chat-container">'
+        
+        # Display all messages
+        for message in st.session_state.chat_history:
+            bubble_class = "user-bubble" if message["role"] == "user" else "assistant-bubble"
+            container_class = "user-container" if message["role"] == "user" else "assistant-container"
+            
+            # For the first assistant message, include example questions
+            if message["role"] == "assistant" and message == st.session_state.chat_history[0]:
+                chat_content += f"""
                 <div class="message-container assistant-container">
                     <div class="message-bubble assistant-bubble">
                         Hello! I'm Contamio, your food safety assistant. I can help you understand food recall data and identify potential risks.
@@ -727,53 +694,64 @@ def main():
                         I'll analyze the data to help you understand food safety risks and trends.
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
-            
-                # Only add to history once
-                if len(st.session_state.chat_history) == 0:
-                    st.session_state.chat_history.append({
-                        "role": "assistant", 
-                        "content": "Hello! I'm Contamio, your food safety assistant. I can help you understand food recall data and identify potential risks."
-                    })
-        
-            # Display chat messages
-            for message in st.session_state.chat_history:
-                bubble_class = "user-bubble" if message["role"] == "user" else "assistant-bubble"
-                container_class = "user-container" if message["role"] == "user" else "assistant-container"
-            
-                st.markdown(f"""
+                """
+            else:
+                chat_content += f"""
                 <div class="message-container {container_class}">
                     <div class="message-bubble {bubble_class}">
                         {message["content"]}
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
+                """
         
-            # Display thinking animation if processing
-            if st.session_state.thinking:
-                st.markdown("""
-                <div class="message-container assistant-container">
-                    <div class="message-bubble thinking-bubble">
-                        Analyzing food recall data...
-                    </div>
+        # Display thinking animation if processing
+        if st.session_state.thinking:
+            chat_content += """
+            <div class="message-container assistant-container">
+                <div class="message-bubble thinking-bubble">
+                    Analyzing food recall data...
                 </div>
-                """, unsafe_allow_html=True)
+            </div>
+            """
         
-            # Close the chat container
-            st.markdown('</div>', unsafe_allow_html=True)
-    
+        # Close the chat container
+        chat_content += '</div>'
+        
+        # Display the chat content
+        chat_placeholder.markdown(chat_content, unsafe_allow_html=True)
+        
+        # Chat input area
+        input_col1, input_col2 = st.columns([6, 1])
+        
+        with input_col1:
+            user_input = st.text_input("", placeholder="Ask about food recalls...", key="user_question")
+        
+        with input_col2:
+            send_pressed = st.button("Send", disabled=st.session_state.thinking)
+        
+        # Process user input
+        if (send_pressed or user_input) and user_input and not st.session_state.thinking:
+            # Add user message to chat history
+            st.session_state.chat_history.append({"role": "user", "content": user_input})
+            
+            # Set thinking state to true
+            st.session_state.thinking = True
+            
+            # Clear the input by forcing a rerun
+            st.rerun()
+        
         # Process any pending thinking state
         if st.session_state.thinking:
             # Get the last user message
             user_input = st.session_state.chat_history[-1]["content"]
-        
+            
             # Format conversation history for Claude
             claude_messages = [
                 {"role": msg["role"], "content": msg["content"]} 
                 for msg in st.session_state.chat_history
                 if msg["role"] in ["user", "assistant"]
             ]
-        
+            
             # Prepare enhanced system prompt for Claude
             system_prompt = f"""
             You are Contamio, a specialized food safety assistant focused on analyzing food recall data and identifying potential risks.
@@ -801,26 +779,18 @@ def main():
             - If the user's question is too broad, ask a follow-up question to narrow the focus.
             - Always explain the practical implications for food safety.
             """
-        
+            
             # Query Claude with enhanced prompt
             response = query_claude(user_input, claude_messages[-10:], system_prompt)
-        
+            
             # Add assistant response to chat history
             st.session_state.chat_history.append({"role": "assistant", "content": response})
+            
+            # Reset thinking state
             st.session_state.thinking = False
-        
-            # Rerun to update the chat display without the thinking indicator
+            
+            # Rerun to update the chat display
             st.rerun()
-    
-        # Chat input with send button (using columns for layout)
-        col1, col2 = st.columns([6, 1])
-    
-        with col1:
-            st.text_input("", placeholder="Ask about food recalls...", key="widget_input", on_change=send_message)
-    
-        with col2:
-            if st.button("Send", key="send_button", disabled=st.session_state.thinking):
-                send_message()
     # Insights Tab
     with tabs[2]:
         st.header("Food Recall Insights")
