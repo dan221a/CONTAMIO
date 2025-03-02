@@ -220,70 +220,51 @@ def main():
         st.warning("No data loaded. Please check your Excel file.")
         return
         
-    # Create tabs for different sections
-    tabs = st.tabs(["📊 Dashboard", "💬 Ask Contamio", "📈 Insights", "ℹ️ About"])
+
+# Create tabs
+tabs = st.tabs(["📊 Dashboard", "💬 Ask Contamio", "📈 Insights", "ℹ️ About"])
+
+# Dashboard Tab
+with tabs[0]:
+    # Dashboard code...
+
+# Ask Contamio Tab
+with tabs[1]:
+    st.header("Ask Contamio about Food Recalls")
     
-    # Dashboard Tab
-    with tabs[0]:
-        st.header("Food Recall Dashboard")
-        
-        # Summary metrics
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric("Total Recalls", len(df))
-        
-        with col2:
-            st.metric("Unique Companies", df["Recalling Firm Name"].nunique())
-            
-        with col3:
-            st.metric("Latest Year", df["Year"].max())
-            
-        with col4:
-            st.metric("Food Categories", df["Food Category"].nunique())
-        
-        # Top visualizations
-        st.subheader("Recall Categories")
-        
-        # Clean and prepare data for visualization
-        if "Recall Category" in df.columns:
-            top_categories = df["Recall Category"].value_counts().head(10).reset_index()
-            top_categories.columns = ["Category", "Count"]
-            
-            fig = px.bar(
-                top_categories, 
-                x="Count", 
-                y="Category",
-                orientation='h',
-                color="Count",
-                color_continuous_scale="Blues",
-                title="Top 10 Recall Categories"
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        
-        # Show distribution by year if available
-        if "Year" in df.columns:
-            yearly_counts = df["Year"].value_counts().sort_index().reset_index()
-            yearly_counts.columns = ["Year", "Count"]
-            
-            fig = px.line(
-                yearly_counts, 
-                x="Year", 
-                y="Count",
-                markers=True,
-                title="Recalls by Year"
-            )
-            st.plotly_chart(fig, use_container_width=True)
+    # Initialize chat history if it doesn't exist
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
     
-    # Ask Contamio Tab
-    with tabs[1]:
-        st.header("Ask Contamio about Food Recalls")
+    # Display chat messages
+    for message in st.session_state.chat_history:
+        with st.container():
+            st.markdown(
+                f"""
+                <div class="chat-message {message['role']}">
+                    <div class="message-content">{message['content']}</div>
+                    <div class="message-time">{message['time']}</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+    
+    # Chat input
+    with st.form(key="chat_form", clear_on_submit=True):
+        user_input = st.text_input("Ask about food recalls:", key="user_question")
+        submit_button = st.form_submit_button("Send")
+    
+    # THIS IS THE SECTION TO REPLACE:
+    if submit_button and user_input:
+        # Add user message to chat
+        current_time = datetime.now().strftime("%I:%M %p")
+        st.session_state.chat_history.append({
+            "role": "user",
+            "content": user_input,
+            "time": current_time
+        })
         
-        # Initialize chat history if it doesn't exist
-        if "chat_history" not in st.session_state:
-            st.session_state.chat_history = []
-        
-        # Display chat messages
+        # Display the updated chat with the new user message
         for message in st.session_state.chat_history:
             with st.container():
                 st.markdown(
@@ -296,20 +277,8 @@ def main():
                     unsafe_allow_html=True
                 )
         
-        # Chat input
-        with st.form(key="chat_form", clear_on_submit=True):
-            user_input = st.text_input("Ask about food recalls:", key="user_question")
-            submit_button = st.form_submit_button("Send")
-        
-        if submit_button and user_input:
-            # Add user message to chat
-            current_time = datetime.now().strftime("%I:%M %p")
-            st.session_state.chat_history.append({
-                "role": "user",
-                "content": user_input,
-                "time": current_time
-            })
-            
+        # Show a loading spinner while processing
+        with st.spinner("Contamio is analyzing your question..."):
             # Format conversation history for Claude
             claude_messages = [
                 {"role": msg["role"], "content": msg["content"]} 
@@ -328,17 +297,22 @@ def main():
             
             # Query Claude
             response = query_claude(data_context + "\n\n" + user_input, claude_messages[:-1])
-            
-            # Add assistant response to chat
-            st.session_state.chat_history.append({
-                "role": "assistant",
-                "content": response,
-                "time": datetime.now().strftime("%I:%M %p")
-            })
-            
-            # Rerun to show the updated chat
-            st.rerun()
-    
+        
+        # Add assistant response to chat
+        st.session_state.chat_history.append({
+            "role": "assistant",
+            "content": response,
+            "time": datetime.now().strftime("%I:%M %p")
+        })
+        
+        # Rerun to show the updated chat
+        st.rerun()
+
+# Insights Tab
+with tabs[2]:
+    # Insights code...
+
+# ...rest of the code...
     # Insights Tab
     with tabs[2]:
         st.header("Food Recall Insights")
