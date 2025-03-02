@@ -600,8 +600,9 @@ def main():
         st.dataframe(display_data[display_columns].head(50), use_container_width=True)
     
 
-    # Ask Contamio Tab
-# Ask Contamio Tab
+
+
+     # Ask Contamio Tab
     with tabs[1]:
         st.header("Ask Contamio about Food Recalls")
         
@@ -617,7 +618,6 @@ def main():
             padding: 10px;
             background-color: #f8f9fa;
             border-radius: 10px;
-            min-height: 300px;
         }
         .message-container {
             display: flex;
@@ -675,13 +675,6 @@ def main():
             align-items: center;
             justify-content: center;
         }
-        /* Hide the default empty streamlit containers */
-        .block-container {
-            padding-top: 0;
-        }
-        .stMarkdown {
-            margin-bottom: 0;
-        }
         </style>
         """, unsafe_allow_html=True)
         
@@ -715,52 +708,55 @@ def main():
                 # Rerun to show the user message and thinking indicator
                 st.rerun()
         
-        # Direct rendering of chat container without extra containers
-        st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+        # Create chat container
+        chat_container = st.container()
         
-        # Display chat messages - no empty container
-        for message in st.session_state.chat_history:
-            bubble_class = "user-bubble" if message["role"] == "user" else "assistant-bubble"
-            container_class = "user-container" if message["role"] == "user" else "assistant-container"
+        with chat_container:
+            st.markdown('<div class="chat-container">', unsafe_allow_html=True)
             
-            # For the first assistant message, include example questions
-            if message["role"] == "assistant" and message == st.session_state.chat_history[0]:
-                st.markdown(f"""
+            # Display chat messages - no empty container
+            for message in st.session_state.chat_history:
+                bubble_class = "user-bubble" if message["role"] == "user" else "assistant-bubble"
+                container_class = "user-container" if message["role"] == "user" else "assistant-container"
+                
+                # For the first assistant message, include example questions
+                if message["role"] == "assistant" and message == st.session_state.chat_history[0]:
+                    st.markdown(f"""
+                    <div class="message-container assistant-container">
+                        <div class="message-bubble assistant-bubble">
+                            Hello! I'm Contamio, your food safety assistant. I can help you understand food recall data and identify potential risks.
+                            <br><br>
+                            You can ask me questions like:
+                            <br>- What are the most common reasons for dairy product recalls?
+                            <br>- Are there seasonal patterns in E. coli contamination?
+                            <br>- What food categories have the highest recall rates?
+                            <br>- What should I know about allergen-related recalls?
+                            <br><br>
+                            I'll analyze the data to help you understand food safety risks and trends.
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div class="message-container {container_class}">
+                        <div class="message-bubble {bubble_class}">
+                            {message["content"]}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+            
+            # Display thinking animation if processing
+            if st.session_state.thinking:
+                st.markdown("""
                 <div class="message-container assistant-container">
-                    <div class="message-bubble assistant-bubble">
-                        Hello! I'm Contamio, your food safety assistant. I can help you understand food recall data and identify potential risks.
-                        <br><br>
-                        You can ask me questions like:
-                        <br>- What are the most common reasons for dairy product recalls?
-                        <br>- Are there seasonal patterns in E. coli contamination?
-                        <br>- What food categories have the highest recall rates?
-                        <br>- What should I know about allergen-related recalls?
-                        <br><br>
-                        I'll analyze the data to help you understand food safety risks and trends.
+                    <div class="message-bubble thinking-bubble">
+                        Analyzing food recall data...
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
-            else:
-                st.markdown(f"""
-                <div class="message-container {container_class}">
-                    <div class="message-bubble {bubble_class}">
-                        {message["content"]}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-        
-        # Display thinking animation if processing
-        if st.session_state.thinking:
-            st.markdown("""
-            <div class="message-container assistant-container">
-                <div class="message-bubble thinking-bubble">
-                    Analyzing food recall data...
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # Close the chat container
-        st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Close the chat container
+            st.markdown('</div>', unsafe_allow_html=True)
         
         # Process any pending thinking state
         if st.session_state.thinking:
