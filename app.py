@@ -109,10 +109,10 @@ def search_recalls(query, df):
 
 # Function to query Claude API
 def query_claude(user_message, conversation_history, search_results):
-    client = anthropic.Anthropic(api_key=os.environ.get("CLAUDE_API_KEY"))
+    client = anthropic.Anthropic(api_key=st.secrets["CLAUDE_API_KEY"])
     
-    if not os.environ.get("CLAUDE_API_KEY"):
-        st.error("Claude API key not found. Please set the CLAUDE_API_KEY environment variable.")
+    if "CLAUDE_API_KEY" not in st.secrets:
+        st.error("Claude API key not found. Please set the CLAUDE_API_KEY in Streamlit secrets.")
         return "Sorry, I'm having trouble connecting to my brain right now. Please try again later."
     
     # Prepare search context
