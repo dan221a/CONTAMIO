@@ -85,7 +85,7 @@ st.markdown("""
 # Function to display the Contamio logo
 def display_logo():
     logo_svg = """
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="60" height="60">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
         <circle cx="200" cy="150" r="120" fill="none"/>
         <circle cx="200" cy="150" r="20" fill="#00a3e0"/>
         <circle cx="120" cy="150" r="15" fill="#00a3e0"/>
@@ -106,17 +106,10 @@ def display_logo():
         <circle cx="300" cy="190" r="6" fill="#00a3e0"/>
     </svg>
     """
-    
-    # Create a header with logo and text side by side
-    st.markdown(f'''
-    <div style="display: flex; align-items: center; margin-bottom: 1rem;">
-        <div>{logo_svg}</div>
-        <div style="margin-left: 15px;">
-            <h1 style="color: #00a3e0; margin-bottom: 0; font-size: 2.2rem;">Contamio</h1>
-            <p style="color: #555; margin-top: 0;">Food Recall Analysis Platform</p>
-        </div>
-    </div>
-    ''', unsafe_allow_html=True)
+    st.markdown(f'<div style="text-align: center; margin-bottom: 1rem; width: 100%;">{logo_svg}</div>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">Contamio</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-header">Food Recall Analysis Platform</p>', unsafe_allow_html=True)
+
 # Function to load the data
 @st.cache_data
 def load_data():
@@ -221,7 +214,7 @@ def main():
         return
         
     # Create tabs for different sections
-    tabs = st.tabs([ "💬 Ask Contamio", "📊 Dashboard" , "📈 Insights", "ℹ️ About"])
+    tabs = st.tabs(["📊 Dashboard", "💬 Ask Contamio", "📈 Insights", "ℹ️ About"])
     
     # Dashboard Tab
     with tabs[0]:
@@ -301,56 +294,15 @@ def main():
             user_input = st.text_input("Ask about food recalls:", key="user_question")
             submit_button = st.form_submit_button("Send")
         
-        # In the Ask Contamio Tab
-with tabs[1]:
-    st.header("Ask Contamio about Food Recalls")
-    
-    # Initialize chat history if it doesn't exist
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []
-    
-    # Display chat messages
-    for message in st.session_state.chat_history:
-        with st.container():
-            st.markdown(
-                f"""
-                <div class="chat-message {message['role']}">
-                    <div class="message-content">{message['content']}</div>
-                    <div class="message-time">{message['time']}</div>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-    
-    # Chat input
-    with st.form(key="chat_form", clear_on_submit=True):
-        user_input = st.text_input("Ask about food recalls:", key="user_question")
-        submit_button = st.form_submit_button("Send")
-    
-    if submit_button and user_input:
-        # Add user message to chat
-        current_time = datetime.now().strftime("%I:%M %p")
-        st.session_state.chat_history.append({
-            "role": "user",
-            "content": user_input,
-            "time": current_time
-        })
-        
-        # Display the updated chat with the new user message
-        for message in st.session_state.chat_history:
-            with st.container():
-                st.markdown(
-                    f"""
-                    <div class="chat-message {message['role']}">
-                        <div class="message-content">{message['content']}</div>
-                        <div class="message-time">{message['time']}</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-        
-        # Show a loading spinner while processing
-        with st.spinner("Contamio is analyzing your question..."):
+        if submit_button and user_input:
+            # Add user message to chat
+            current_time = datetime.now().strftime("%I:%M %p")
+            st.session_state.chat_history.append({
+                "role": "user",
+                "content": user_input,
+                "time": current_time
+            })
+            
             # Format conversation history for Claude
             claude_messages = [
                 {"role": msg["role"], "content": msg["content"]} 
@@ -369,16 +321,16 @@ with tabs[1]:
             
             # Query Claude
             response = query_claude(data_context + "\n\n" + user_input, claude_messages[:-1])
-        
-        # Add assistant response to chat
-        st.session_state.chat_history.append({
-            "role": "assistant",
-            "content": response,
-            "time": datetime.now().strftime("%I:%M %p")
-        })
-        
-        # Rerun to show the updated chat
-        st.rerun()
+            
+            # Add assistant response to chat
+            st.session_state.chat_history.append({
+                "role": "assistant",
+                "content": response,
+                "time": datetime.now().strftime("%I:%M %p")
+            })
+            
+            # Rerun to show the updated chat
+            st.rerun()
     
     # Insights Tab
     with tabs[2]:
