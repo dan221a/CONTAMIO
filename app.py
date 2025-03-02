@@ -4,6 +4,21 @@ import anthropic
 import plotly.express as px
 from datetime import datetime
 
+    # interactive plotly charts
+def plotly_chart(fig, key=None, use_container_width=True):
+    """Wrapper for st.plotly_chart that returns selected points."""
+    # Create a placeholder for the chart
+    chart_placeholder = st.empty()
+    
+    # Display the chart
+    chart = chart_placeholder.plotly_chart(fig, key=key, use_container_width=use_container_width)
+    
+    # Get chart selection data from session state
+    if key is not None and f"plotly_{key}" in st.session_state:
+        return st.session_state[f"plotly_{key}"]
+    
+    return None
+    
 # Set page configuration
 st.set_page_config(
     page_title="Contamio Food Recall Analysis",
@@ -226,54 +241,309 @@ def main():
     # Dashboard Tab
     with tabs[0]:
         st.header("Food Recall Dashboard")
+    
+        # Load and process data for dashboard
+        if "filtered_data" not in st.session_state:
+            st.session_state.filtered_data = df.copy()
+            st.session_state.selected_filter = None
         
-        # Summary metrics
+        # Add filters sidebar
+        st.sidebar.header("Filters")
+    
+        # Year filter
+        available_years = sorted(df["Year"].dropna().unique().tolist())
+        selected_years = st.sidebar.multiselect(
+            "Select Years", 
+            available_years,
+            default=available_years
+        )
+    
+        # Filter for common recall reasons
+        top_reasons = df["Recall Category"].value_counts().head(10).index.tolist()
+        selected_reason = st.sidebar.multiselect(
+            "Recall Category",
+            top_reasons,
+            default=[]
+        )
+    
+        # Filter for common contaminants
+        contaminants = df[df["Recall Category"] == "Microbial Contamination"]["Detailed Recall Category"].value_counts().head(10).index.tolist()
+        selected_contaminant = st.sidebar.multiselect(
+            "Contaminant Type",
+            contaminants,
+            default=[]
+        )
+        
+        # Apply filters to data
+        filtered_data = df.copy()
+        if selected_years:
+            filtered_data = filtered_data[filtered_data["Year"].isin(selected_years)]
+        if selected_reason:
+            filtered_data = filtered_data[filtered_data["Recall Category"].isin(selected_reason)]
+        if selected_contaminant:
+            filtered_data = filtered_data[filtered_data["Detailed Recall Category"].isin(selected_contaminant)]
+    
+        # Update session state
+        st.session_state.filtered_data = filtered_data
+    
+        # Summary metrics in a nice grid with colored cards
+        st.markdown("""
+        <style>
+        .metric-card {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px 10px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+        .metric-card:hover {
+            transform: translateY(-5px);
+        }
+        .metric-value {
+            font-size: 2.2rem;
+            font-weight: bold;
+            color: #00a3e0;
+            margin-bottom: 5px;
+        }
+        .metric-label {
+            font-size: 1rem;
+            color: #555;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+    
         col1, col2, col3, col4 = st.columns(4)
-        
+    
         with col1:
-            st.metric("Total Recalls", len(df))
-        
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-value">{len(filtered_data):,}</div>
+                <div class="metric-label">Total Recalls</div>
+            </div>
+            """, unsafe_allow_html=True)
+    
         with col2:
-            st.metric("Unique Companies", df["Recalling Firm Name"].nunique())
-            
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-value">{filtered_data["Recalling Firm Name"].nunique():,}</div>
+                <div class="metric-label">Unique Companies</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
         with col3:
-            st.metric("Latest Year", df["Year"].max())
-            
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-value">{filtered_data["Food Category"].nunique():,}</div>
+                <div class="metric-label">Food Categories</div>
+            </div>
+            """, unsafe_allow_html=True)
+        
         with col4:
-            st.metric("Food Categories", df["Food Category"].nunique())
+            affected_states = 0
+            if "Distribution Pattern" in filtered_data.columns:
+                # Count unique states mentioned in distribution patterns
+                all_states = []
+                for pattern in filtered_data["Distribution Pattern"].dropna():
+                    if isinstance(pattern, str):
+                        states = [s.strip() for s in pattern.split(",") if len(s.strip()) == 2]
+                        all_states.extend(states)
+                affected_states = len(set(all_states))
         
-        # Top visualizations
-        st.subheader("Recall Categories")
-        
-        # Clean and prepare data for visualization
-        if "Recall Category" in df.columns:
-            top_categories = df["Recall Category"].value_counts().head(10).reset_index()
-            top_categories.columns = ["Category", "Count"]
+            st.markdown(f"""
+            <div class="metric-card">
+                <div class="metric-value">{affected_states if affected_states > 0 else 'N/A'}</div>
+                <div class="metric-label">Affected States</div>
+            </div>
+            """, unsafe_allow_html=True)
+    
+        # Main visualizations section
+        st.subheader("Recall Analysis")
+    
+        # Create two columns for the charts
+        viz_col1, viz_col2 = st.columns(2)
+    
+        with viz_col1:
+            # Recall Categories Chart (clickable)
+            if "Recall Category" in filtered_data.columns:
+                top_categories = filtered_data["Recall Category"].value_counts().head(10).reset_index()
+                top_categories.columns = ["Category", "Count"]
             
-            fig = px.bar(
-                top_categories, 
-                x="Count", 
-                y="Category",
-                orientation='h',
-                color="Count",
-                color_continuous_scale="Blues",
-                title="Top 10 Recall Categories"
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        
-        # Show distribution by year if available
-        if "Year" in df.columns:
-            yearly_counts = df["Year"].value_counts().sort_index().reset_index()
-            yearly_counts.columns = ["Year", "Count"]
+                fig = px.bar(
+                    top_categories, 
+                    x="Count", 
+                    y="Category",
+                    orientation='h',
+                    color="Count",
+                    color_continuous_scale="Blues",
+                    title="Top 10 Recall Categories"
+                )
+                fig.update_layout(
+                    height=400,
+                    clickmode='event+select'
+                )
             
-            fig = px.line(
-                yearly_counts, 
-                x="Year", 
-                y="Count",
-                markers=True,
-                title="Recalls by Year"
-            )
-            st.plotly_chart(fig, use_container_width=True)
+                # Make chart interactive
+                selected_points = plotly_chart(fig, key="recall_categories_chart", use_container_width=True)
+                
+                # Process clicks on the chart
+                if selected_points:
+                    selected_category = top_categories.iloc[selected_points["points"][0]["pointIndex"]]["Category"]
+                    st.session_state.selected_filter = ("Recall Category", selected_category)
+                    st.experimental_rerun()
+    
+        with viz_col2:
+            # Detailed Recall Categories Chart (clickable)
+            if "Detailed Recall Category" in filtered_data.columns:
+                detailed_categories = filtered_data["Detailed Recall Category"].value_counts().head(10).reset_index()
+                detailed_categories.columns = ["Category", "Count"]
+            
+                fig = px.bar(
+                    detailed_categories, 
+                    x="Count", 
+                    y="Category",
+                    orientation='h',
+                    color="Count",
+                    color_continuous_scale="Greens",
+                    title="Top 10 Detailed Recall Categories"
+                )
+                fig.update_layout(
+                    height=400,
+                    clickmode='event+select'
+                )
+            
+                # Make chart interactive
+                selected_points = plotly_chart(fig, key="detailed_categories_chart", use_container_width=True)
+            
+                # Process clicks on the chart
+                if selected_points:
+                    selected_category = detailed_categories.iloc[selected_points["points"][0]["pointIndex"]]["Category"]
+                    st.session_state.selected_filter = ("Detailed Recall Category", selected_category)
+                    st.experimental_rerun()
+    
+        # Second row of visualizations
+        viz_col3, viz_col4 = st.columns(2)
+    
+        with viz_col3:
+            # Time series of recalls by month/year
+            if "Year" in filtered_data.columns and "Month Name" in filtered_data.columns:
+                # Create month order mapping
+                month_order = {
+                    "January": 1, "February": 2, "March": 3, "April": 4,
+                    "May": 5, "June": 6, "July": 7, "August": 8,
+                    "September": 9, "October": 10, "November": 11, "December": 12
+                }
+            
+                # Prepare time series data
+                filtered_data["MonthOrder"] = filtered_data["Month Name"].map(month_order)
+            
+                time_data = filtered_data.groupby(["Year", "Month Name", "MonthOrder"]).size().reset_index(name="Count")
+                time_data = time_data.sort_values(["Year", "MonthOrder"])
+                time_data["Date"] = time_data["Year"].astype(str) + "-" + time_data["MonthOrder"].astype(str).str.zfill(2)
+            
+                fig = px.line(
+                    time_data, 
+                    x="Date", 
+                    y="Count",
+                    markers=True,
+                    title="Recalls Over Time"
+                )
+                fig.update_layout(height=400)
+                st.plotly_chart(fig, use_container_width=True)
+    
+        with viz_col4:
+            # Food Categories Distribution
+            if "Food Category" in filtered_data.columns:
+                food_categories = filtered_data["Food Category"].value_counts().head(10).reset_index()
+                food_categories.columns = ["Category", "Count"]
+            
+                fig = px.pie(
+                    food_categories, 
+                    values="Count", 
+                    names="Category",
+                    title="Top Food Categories",
+                    hole=0.4,
+                    color_discrete_sequence=px.colors.qualitative.Pastel
+                )
+                fig.update_layout(height=400)
+            
+                # Make chart interactive
+                selected_points = plotly_chart(fig, key="food_categories_chart", use_container_width=True)
+            
+                # Process clicks on the chart
+                if selected_points:
+                    selected_category = food_categories.iloc[selected_points["points"][0]["pointIndex"]]["Category"]
+                    st.session_state.selected_filter = ("Food Category", selected_category)
+                    st.experimental_rerun()
+    
+        # Third row - geographical distribution and seasonal trends
+        viz_col5, viz_col6 = st.columns(2)
+    
+        with viz_col5:
+            # Seasonal trends
+            if "Season" in filtered_data.columns:
+                season_data = filtered_data["Season"].value_counts().reset_index()
+                season_data.columns = ["Season", "Count"]
+            
+                # Define season order
+                season_order = {"Winter": 1, "Spring": 2, "Summer": 3, "Fall": 4}
+                season_data["Order"] = season_data["Season"].map(season_order)
+                season_data = season_data.sort_values("Order")
+            
+                fig = px.bar(
+                    season_data, 
+                    x="Season", 
+                    y="Count",
+                    color="Count",
+                    color_continuous_scale="Viridis",
+                    title="Recalls by Season"
+                )
+                fig.update_layout(height=350)
+                st.plotly_chart(fig, use_container_width=True)
+    
+        with viz_col6:
+            # Company Size breakdown
+            if "Company Size" in filtered_data.columns:
+                company_size = filtered_data["Company Size"].value_counts().reset_index()
+                company_size.columns = ["Size", "Count"]
+            
+                fig = px.pie(
+                    company_size, 
+                    values="Count", 
+                    names="Size",
+                    title="Recalls by Company Size",
+                    color_discrete_sequence=px.colors.qualitative.Bold
+                )
+                fig.update_layout(height=350)
+                st.plotly_chart(fig, use_container_width=True)
+    
+        # Data table with search functionality
+        st.subheader("Recent Recalls")
+    
+        search_term = st.text_input("Search recalls", "")
+    
+        if search_term:
+            search_results = filtered_data[
+                filtered_data["Product Description"].str.contains(search_term, case=False, na=False) |
+                filtered_data["Recalling Firm Name"].str.contains(search_term, case=False, na=False) |
+                filtered_data["Reason for Recall"].str.contains(search_term, case=False, na=False)
+            ]
+            display_data = search_results
+        else:
+            display_data = filtered_data
+    
+        # Select the most relevant columns for display
+        display_columns = ["Recalling Firm Name", "Product Description", "Reason for Recall", 
+                          "Food Category", "Center Classification Date", "Status"]
+    
+        display_columns = [col for col in display_columns if col in display_data.columns]
+    
+        # Show most recent recalls first
+        if "Center Classification Date" in display_data.columns:
+            display_data = display_data.sort_values("Center Classification Date", ascending=False)
+    
+        # Show only a limited number of rows to avoid overwhelming the UI
+        st.dataframe(display_data[display_columns].head(50), use_container_width=True)
     
     # Ask Contamio Tab
     with tabs[1]:
