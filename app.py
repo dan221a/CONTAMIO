@@ -141,17 +141,108 @@ def load_data():
     except Exception as e:
         st.error(f"Error loading Excel file: {str(e)}")
         return pd.DataFrame()
-        
+
+
 # query_claude
-def query_claude(prompt, conversation_history=None, system_prompt=None):
+    
+def query_claude(user_message, conversation_history=None, system_prompt=None):
     try:
-        # Get API key from secrets
-        if "CLAUDE_API_KEY" in st.secrets:
-            api_key = st.secrets["CLAUDE_API_KEY"]
-        elif "anthropic" in st.secrets and "CLAUDE_API_KEY" in st.secrets["anthropic"]:
-            api_key = st.secrets["anthropic"]["CLAUDE_API_KEY"]
-        else:
-            return "API key not found in Streamlit secrets."
+        # קוד קיים לקבלת ה-API key...
+        
+        # טען את הנתונים עם הפונקציה שכבר קיימת
+        df = load_data()
+        
+        # בסיסי: חישוב סטטיסטיקות מההתפלגות במקום רק לקחת את הערכים העליונים
+        top_recall_reasons = df['Recall Category'].value_counts().head(10).to_dict()
+        
+        # פירוט יותר לעומק של דוגמאות ספציפיות לכל קטגוריה נפוצה
+        category_examples = {}
+        for category in df['Recall Category'].value_counts().head(5).index:
+            examples = df[df['Recall Category'] == category]['Product Description'].sample(min(3, len(df[df['Recall Category'] == category]))).tolist()
+            category_examples[category] = examples
+        
+        # התפלגות לפי שנים - מגמות
+        yearly_distribution = {}
+        if 'Year' in df.columns:
+            yearly_distribution = df.groupby('Year').size().to_dict()
+        
+        # התפלגות לפי סיווג FDA (חומרת הריקול)
+        severity_distribution = {}
+        if 'Product Classification' in df.columns:
+            severity_distribution = df['Product Classification'].value_counts().to_dict()
+        
+        # מידע ספציפי לשאלה של המשתמש
+        specific_info = {}
+        
+        # בדיקה אם השאלה על מוצרי חלב
+        if "dairy" in user_message.lower() or "חלב" in user_message:
+            dairy_data = df[df['Food Category'].str.contains('Dairy|חלב', case=False, na=False)]
+            specific_info["dairy"] = {
+                "count": len(dairy_data),
+                "reasons": dairy_data['Recall Category'].value_counts().head(5).to_dict() if not dairy_data.empty else {}
+            }
+        
+        # בדיקה אם השאלה על בקטריות
+        bacteria_terms = ["e.coli", "e. coli", "אי קולי", "listeria", "ליסטריה", "salmonella", "סלמונלה"]
+        if any(term in user_message.lower() for term in bacteria_terms):
+            bacteria_data = df[df['Detailed Recall Category'].str.contains('|'.join(bacteria_terms), case=False, na=False)]
+            specific_info["bacteria"] = {
+                "count": len(bacteria_data),
+                "foods": bacteria_data['Food Category'].value_counts().head(5).to_dict() if not bacteria_data.empty else {}
+            }
+            
+        # בניית פרומפט משופר
+        enhanced_system_prompt = f"""
+        You are Contamio, a specialized food safety assistant focused on analyzing food recall data and identifying potential risks.
+
+        IMPORTANT GUIDELINES:
+        1. Focus on helping the user understand specific food safety risks based on the recall database.
+        2. Adjust your response length based on the complexity of the query - be concise for simple questions, more thorough for complex ones.
+        3. When appropriate, ask clarifying questions to better understand the user's specific concerns.
+        4. Include relevant statistics from the recall database to support your insights.
+        5. Prioritize practical information about food safety risks, prevention, and patterns in recalls.
+        6. Break down complex information into clear, structured explanations.
+        7. When relevant, explain the implications of recall patterns for consumers.
+
+        ENHANCED DATABASE CONTEXT:
+        - Food recall database with {len(df)} records from {df['Year'].min()} to {df['Year'].max()}.
+        
+        - Top 10 recall reasons and their frequency:
+        {json.dumps(top_recall_reasons, indent=2)}
+        
+        - Examples of specific recalls for common categories:
+        {json.dumps(category_examples, indent=2)}
+        
+        - Yearly distribution of recalls:
+        {json.dumps(yearly_distribution, indent=2)}
+        
+        - Recalls by FDA classification (severity):
+        {json.dumps(severity_distribution, indent=2)}
+        
+        FOOD SAFETY EXPERT KNOWLEDGE:
+        1. FDA Recall Classifications:
+           - Class I: Dangerous or defective products that could cause serious health problems
+           - Class II: Products that might cause temporary health problem, or slight threat
+           - Class III: Products that are unlikely to cause any adverse health reaction, but violate regulations
+
+        2. Common Contaminants Impact:
+           - Listeria monocytogenes: Particularly dangerous for pregnant women, elderly, causes listeriosis
+           - E. coli: Can cause severe stomach cramps, bloody diarrhea, and vomiting
+           - Salmonella: Causes diarrhea, fever, and abdominal cramps, symptoms develop 12-72 hours after infection
+
+        3. Allergen Regulations:
+           - Major food allergens require specific labeling (milk, eggs, fish, shellfish, tree nuts, peanuts, wheat, soybeans)
+           - Undeclared allergens are the leading cause of recalls in processed foods
+        """
+        
+        # אם יש מידע ספציפי לשאלה, הוסף אותו
+        if specific_info:
+            enhanced_system_prompt += f"\n\nSPECIFIC INFORMATION FOR THIS QUERY:\n{json.dumps(specific_info, indent=2)}"
+        
+        # השתמש בפרומפט המשופר או בפרומפט שהועבר
+        final_system_prompt = enhanced_system_prompt if system_prompt is None else system_prompt
+        
+        # המשך הקוד הקיים לשליחת הבקשה לקלוד...
         
         # Prepare headers for direct API call
         headers = {
@@ -166,23 +257,17 @@ def query_claude(prompt, conversation_history=None, system_prompt=None):
             messages.extend(conversation_history)
         
         # Add the current prompt
-        messages.append({"role": "user", "content": prompt})
+        messages.append({"role": "user", "content": user_message})
         
         # Prepare request body
         request_body = {
             "model": "claude-3-opus-20240229",
-            "max_tokens": 1500,  # Increased for more flexible response length
-            "messages": messages
+            "max_tokens": 1500,
+            "messages": messages,
+            "system": final_system_prompt
         }
         
-        # Add system prompt if provided
-        if system_prompt:
-            request_body["system"] = system_prompt
-        else:
-            request_body["system"] = "You are Contamio, a food safety analysis assistant focused on analyzing food recall data in the USA."
-        
         # Make direct API call using requests
-        import requests
         response = requests.post(
             "https://api.anthropic.com/v1/messages",
             headers=headers,
