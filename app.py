@@ -97,6 +97,44 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+def get_basic_insights(df):
+    """Calculate basic insights from the data without using complex libraries"""
+    insights = []
+    
+    # 1. Identify most common recall reasons
+    if 'Recall Category' in df.columns:
+        top_reasons = df['Recall Category'].value_counts().head(3)
+        reasons_text = ", ".join([f"{reason} ({count} recalls)" for reason, count in top_reasons.items()])
+        insights.append(f"Most common recall reasons: {reasons_text}")
+    
+    # 2. Identify high-risk food categories
+    if 'Food Category' in df.columns and 'Product Classification' in df.columns:
+        # Sort categories by percentage of severe recalls (Class I)
+        high_risk_food = {}
+        for category in df['Food Category'].unique():
+            category_data = df[df['Food Category'] == category]
+            if len(category_data) >= 10:  # Only categories with enough data
+                class_i_count = category_data[category_data['Product Classification'] == 'Class I'].shape[0]
+                class_i_percent = (class_i_count / len(category_data)) * 100 if len(category_data) > 0 else 0
+                high_risk_food[category] = class_i_percent
+        
+        # Sort and take top 3
+        sorted_risk = sorted(high_risk_food.items(), key=lambda x: x[1], reverse=True)[:3]
+        for category, percent in sorted_risk:
+            insights.append(f"High risk category: {category} with {percent:.1f}% Class I recalls")
+    
+    # 3. Identify common allergens
+    if 'Detailed Recall Category' in df.columns and 'Recall Category' in df.columns:
+        try:
+            allergen_data = df[df['Recall Category'].str.contains('Allergen', case=False, na=False)]
+            if not allergen_data.empty and 'Detailed Recall Category' in allergen_data.columns:
+                allergen_types = allergen_data['Detailed Recall Category'].value_counts().head(3)
+                allergens_text = ", ".join([f"{allergen} ({count})" for allergen, count in allergen_types.items()])
+                insights.append(f"Most common undeclared allergens: {allergens_text}")
+        except:
+            pass  # Skip if there's an error processing allergen data
+    
+    return insights
 # Function to display the Contamio logo
 def display_logo():
     logo_svg = """
@@ -599,13 +637,13 @@ def main():
         # Show only a limited number of rows to avoid overwhelming the UI
         st.dataframe(display_data[display_columns].head(50), use_container_width=True)
         # בתוך ה-Dashboard tab, בסוף
-
+        # In the Dashboard tab, add this at the end
         st.subheader("📊 Key Insights")
 
-        # חישוב תובנות בסיסיות
+        # Calculate basic insights
         insights = get_basic_insights(df)
 
-        # הצגת התובנות
+        # Display insights
         if insights:
             for insight in insights:
                 st.info(insight)
