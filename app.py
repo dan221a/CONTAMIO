@@ -603,270 +603,122 @@ def main():
 
      # Ask Contamio Tab
     with tabs[1]:
-        # מסיר כותרות מיותרות לחוויה נקייה יותר
-        
-        # סגנון CSS שמחקה את וואטסאפ
+        # Configure the container for proper spacing
         st.markdown("""
         <style>
-            /* רקע כללי */
-            div[data-testid="stAppViewContainer"] > div:nth-child(2) {
+            /* Basic container styling */
+            .chat-area {
                 background-color: #f0f2f5;
-            }
-            
-            /* מיכל הצ'אט */
-            .chat-message {
-                padding: 10px 15px;
-                border-radius: 15px;
+                border-radius: 10px;
+                height: 480px;
                 margin-bottom: 10px;
-                position: relative;
-                max-width: 75%;
-                animation: fadeIn 0.3s;
-            }
-            
-            @keyframes fadeIn {
-                from { opacity: 0; transform: translateY(10px); }
-                to { opacity: 1; transform: translateY(0); }
-            }
-            
-            /* הודעות משתמש - לבן מימין */
-            .user-message {
-                background-color: white;
-                margin-left: auto;
-                margin-right: 10px;
-                border-top-right-radius: 5px;
-                box-shadow: 0 1px 1px rgba(0,0,0,0.1);
-            }
-            
-            /* הודעות מערכת - כחול בהיר משמאל */
-            .assistant-message {
-                background-color: #e3f2fd;
-                margin-right: auto;
-                margin-left: 10px;
-                border-top-left-radius: 5px;
-                box-shadow: 0 1px 1px rgba(0,0,0,0.1);
-            }
-            
-            /* חשיבה - אנימציה */
-            .thinking {
+                overflow-y: auto;
                 display: flex;
-                align-items: center;
-                background-color: #e3f2fd;
-                margin-right: auto;
-                margin-left: 10px;
+                flex-direction: column;
+            }
+            
+            /* Message styling */
+            .message {
+                margin: 8px 15px;
+                max-width: 75%;
                 padding: 10px 15px;
                 border-radius: 15px;
-                border-top-left-radius: 5px;
-                width: fit-content;
+                position: relative;
+                word-wrap: break-word;
             }
             
-            .thinking-dot {
-                width: 8px;
-                height: 8px;
-                margin: 0 2px;
-                background-color: #00a3e0;
-                border-radius: 50%;
-                animation: pulse 1.5s infinite ease-in-out;
-            }
-            
-            .thinking-dot:nth-child(1) { animation-delay: 0s; }
-            .thinking-dot:nth-child(2) { animation-delay: 0.3s; }
-            .thinking-dot:nth-child(3) { animation-delay: 0.6s; }
-            
-            @keyframes pulse {
-                0%, 100% { opacity: 0.4; transform: scale(0.8); }
-                50% { opacity: 1; transform: scale(1); }
-            }
-            
-            /* שורת הזמן */
-            .timestamp {
-                font-size: 11px;
-                color: #8696a0;
-                margin-top: 3px;
-                text-align: right;
-            }
-            
-            /* תיבת הקלט */
-            .input-container {
-                display: flex;
-                margin-top: 10px;
+            .user {
                 background-color: white;
-                padding: 5px;
-                border-radius: 20px;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                align-self: flex-end;
+                border-top-right-radius: 5px;
             }
             
-            /* מסתיר את הריווח הסטנדרטי של סטרימליט */
-            div.block-container {
-                padding-top: 0;
-                padding-bottom: 0;
-                margin-top: 0;
+            .assistant {
+                background-color: #e3f2fd;
+                align-self: flex-start;
+                border-top-left-radius: 5px;
             }
             
-            div[data-testid="stVerticalBlock"] > div {
-                padding-top: 0 !important;
-                padding-bottom: 0 !important;
-            }
-            
-            /* מסתיר את המסגרת של תיבת הטקסט */
-            div.stTextInput > div > div > input {
-                border: none !important;
-                background-color: transparent !important;
-                box-shadow: none !important;
-                padding-left: 10px !important;
-            }
-            
-            /* כפתור שליחה */
-            div.stButton > button {
-                background-color: #00a3e0 !important;
-                color: white !important;
-                border-radius: 50% !important;
-                width: 40px !important;
-                height: 40px !important;
-                display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
-                padding: 0 !important;
-                border: none !important;
-                box-shadow: none !important;
-            }
-            
-            /* מיכל ההודעות עם גלילה */
-            .chat-container {
-                height: 450px;
-                overflow-y: auto;
-                padding: 20px 10px;
-                background-color: #f0f2f5;
-                background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23dddddd' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E");
-            }
-            
-            /* כותרת הצ'אט */
-            .chat-header {
-                background-color: #00a3e0;
-                color: white;
-                padding: 10px 15px;
+            /* Input area styling */
+            .input-area {
                 display: flex;
-                align-items: center;
-                border-radius: 10px 10px 0 0;
+                padding: 10px;
+                background-color: white;
+                border-radius: 20px;
+                margin-top: 10px;
             }
             
-            .chat-header img {
-                width: 40px;
-                height: 40px;
-                border-radius: 50%;
-                margin-right: 15px;
-            }
-            
-            .chat-header-text h3 {
-                margin: 0;
-                font-size: 18px;
-            }
-            
-            .chat-header-text p {
-                margin: 0;
-                font-size: 14px;
-                opacity: 0.8;
-            }
+            /* Remove default Streamlit element spacing */
+            div.block-container {padding-top: 0; padding-bottom: 0;}
+            div[data-testid="stVerticalBlock"] > div {padding: 0 !important;}
         </style>
         """, unsafe_allow_html=True)
         
-        # אתחול מצב שיחה
+        # Initialize session state
         if "messages" not in st.session_state:
             st.session_state.messages = [
-                {"role": "assistant", "content": "שלום! אני קונטמיו, עוזר בטיחות המזון שלך. אני יכול לעזור לך להבין נתוני recall מזון ולזהות סיכונים פוטנציאליים.\n\nאתה יכול לשאול אותי שאלות כמו:\n- מהן הסיבות הנפוצות ביותר לריקול מוצרי חלב?\n- האם יש דפוסים עונתיים בזיהום E. coli?\n- אילו קטגוריות מזון יש להן את שיעורי הריקול הגבוהים ביותר?\n- מה עלי לדעת לגבי ריקולים הקשורים לאלרגנים?\n\nאני אנתח את הנתונים כדי לעזור לך להבין סיכוני בטיחות מזון ומגמות.", "time": "עכשיו"}
+                {"role": "assistant", "content": "שלום! אני קונטמיו, עוזר בטיחות המזון שלך. אני יכול לעזור לך להבין נתוני recall מזון ולזהות סיכונים פוטנציאליים.\n\nאתה יכול לשאול אותי שאלות כמו:\n\n- מהן הסיבות הנפוצות ביותר לריקול מוצרי חלב?\n- האם יש דפוסים עונתיים בזיהום E. coli?\n- אילו קטגוריות מזון יש להן את שיעורי הריקול הגבוהים ביותר?\n- מה עלי לדעת לגבי ריקולים הקשורים לאלרגנים?\n\nאני אנתח את הנתונים כדי לעזור לך להבין סיכוני בטיחות מזון ומגמות."}
             ]
         
-        if "thinking" not in st.session_state:
-            st.session_state.thinking = False
-        
-        # כותרת הצ'אט בסגנון וואטסאפ
+        # Header
         st.markdown("""
-        <div class="chat-header">
-            <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MDAgMzAwIj48Y2lyY2xlIGN4PSIyMDAiIGN5PSIxNTAiIHI9IjEyMCIgZmlsbD0ibm9uZSIvPjxjaXJjbGUgY3g9IjIwMCIgY3k9IjE1MCIgcj0iMjAiIGZpbGw9IiNmZmZmZmYiLz48Y2lyY2xlIGN4PSIxMjAiIGN5PSIxNTAiIHI9IjE1IiBmaWxsPSIjZmZmZmZmIi8+PGNpcmNsZSBjeD0iMjgwIiBjeT0iMTUwIiByPSIxNSIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjE0MCIgY3k9IjkwIiByPSIxMCIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjI2MCIgY3k9IjkwIiByPSIxMCIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjE0MCIgY3k9IjIxMCIgcj0iMTAiIGZpbGw9IiNmZmZmZmYiLz48Y2lyY2xlIGN4PSIyNjAiIGN5PSIyMTAiIHI9IjEwIiBmaWxsPSIjZmZmZmZmIi8+PGNpcmNsZSBjeD0iMTcwIiBjeT0iNzAiIHI9IjgiIGZpbGw9IiNmZmZmZmYiLz48Y2lyY2xlIGN4PSIyMzAiIGN5PSI3MCIgcj0iOCIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjE3MCIgY3k9IjIzMCIgcj0iOCIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjIzMCIgY3k9IjIzMCIgcj0iOCIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjIwMCIgY3k9IjUwIiByPSIxMiIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjIwMCIgY3k9IjI1MCIgcj0iMTIiIGZpbGw9IiNmZmZmZmYiLz48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxMTAiIHI9IjYiIGZpbGw9IiNmZmZmZmYiLz48Y2lyY2xlIGN4PSIzMDAiIGN5PSIxMTAiIHI9IjYiIGZpbGw9IiNmZmZmZmYiLz48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxOTAiIHI9IjYiIGZpbGw9IiNmZmZmZmYiLz48Y2lyY2xlIGN4PSIzMDAiIGN5PSIxOTAiIHI9IjYiIGZpbGw9IiNmZmZmZmYiLz48L3N2Zz4=" alt="Contamio">
-            <div class="chat-header-text">
-                <h3>Contamio</h3>
-                <p>Food Safety Assistant</p>
+        <div style="background-color: #00a3e0; color: white; padding: 10px 15px; display: flex; align-items: center; border-radius: 10px 10px 0 0;">
+            <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MDAgMzAwIj48Y2lyY2xlIGN4PSIyMDAiIGN5PSIxNTAiIHI9IjEyMCIgZmlsbD0ibm9uZSIvPjxjaXJjbGUgY3g9IjIwMCIgY3k9IjE1MCIgcj0iMjAiIGZpbGw9IiNmZmZmZmYiLz48Y2lyY2xlIGN4PSIxMjAiIGN5PSIxNTAiIHI9IjE1IiBmaWxsPSIjZmZmZmZmIi8+PGNpcmNsZSBjeD0iMjgwIiBjeT0iMTUwIiByPSIxNSIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjE0MCIgY3k9IjkwIiByPSIxMCIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjI2MCIgY3k9IjkwIiByPSIxMCIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjE0MCIgY3k9IjIxMCIgcj0iMTAiIGZpbGw9IiNmZmZmZmYiLz48Y2lyY2xlIGN4PSIyNjAiIGN5PSIyMTAiIHI9IjEwIiBmaWxsPSIjZmZmZmZmIi8+PGNpcmNsZSBjeD0iMTcwIiBjeT0iNzAiIHI9IjgiIGZpbGw9IiNmZmZmZmYiLz48Y2lyY2xlIGN4PSIyMzAiIGN5PSI3MCIgcj0iOCIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjE3MCIgY3k9IjIzMCIgcj0iOCIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjIzMCIgY3k9IjIzMCIgcj0iOCIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjIwMCIgY3k9IjUwIiByPSIxMiIgZmlsbD0iI2ZmZmZmZiIvPjxjaXJjbGUgY3g9IjIwMCIgY3k9IjI1MCIgcj0iMTIiIGZpbGw9IiNmZmZmZmYiLz48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxMTAiIHI9IjYiIGZpbGw9IiNmZmZmZmYiLz48Y2lyY2xlIGN4PSIzMDAiIGN5PSIxMTAiIHI9IjYiIGZpbGw9IiNmZmZmZmYiLz48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxOTAiIHI9IjYiIGZpbGw9IiNmZmZmZmYiLz48Y2lyY2xlIGN4PSIzMDAiIGN5PSIxOTAiIHI9IjYiIGZpbGw9IiNmZmZmZmYiLz48L3N2Zz4=" width="40" height="40" style="margin-right: 15px;">
+            <div>
+                <h3 style="margin: 0; font-size: 18px;">Contamio</h3>
+                <p style="margin: 0; font-size: 14px; opacity: 0.8;">Food Safety Assistant</p>
             </div>
         </div>
         """, unsafe_allow_html=True)
         
-        # מיכל ההודעות
-        chat_container = st.container()
-        with chat_container:
-            st.markdown('<div class="chat-container">', unsafe_allow_html=True)
-            
-            # הצגת כל ההודעות
-            for message in st.session_state.messages:
-                if message["role"] == "user":
-                    st.markdown(f"""
-                    <div class="chat-message user-message">
-                        {message["content"]}
-                        <div class="timestamp">{message.get("time", "now")}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    st.markdown(f"""
-                    <div class="chat-message assistant-message">
-                        {message["content"]}
-                        <div class="timestamp">{message.get("time", "now")}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-            
-            # אינדיקטור "חושב" אם המערכת מעבדת
-            if st.session_state.thinking:
-                st.markdown("""
-                <div class="thinking">
-                    <div class="thinking-dot"></div>
-                    <div class="thinking-dot"></div>
-                    <div class="thinking-dot"></div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-            st.markdown('</div>', unsafe_allow_html=True)
+        # Chat messages area
+        chat_placeholder = st.empty()
         
-        # אזור קלט בסגנון וואטסאפ
-        with st.container():
-            st.markdown('<div class="input-container">', unsafe_allow_html=True)
-            
-            col1, col2 = st.columns([5, 1])
-            
-            with col1:
-                user_input = st.text_input("", placeholder="Type a message...", key="chat_input", label_visibility="collapsed")
-            
-            with col2:
-                send_button = st.button("↑", disabled=st.session_state.thinking)
-                
-            st.markdown('</div>', unsafe_allow_html=True)
+        # Display messages
+        messages_html = '<div class="chat-area">'
         
-        # עיבוד הקלט של המשתמש
-        if (send_button or user_input) and user_input and not st.session_state.thinking:
-            # קבלת הזמן הנוכחי
-            current_time = datetime.now().strftime("%H:%M")
+        for message in st.session_state.messages:
+            role_class = "user" if message["role"] == "user" else "assistant"
+            messages_html += f'<div class="message {role_class}">{message["content"]}</div>'
             
-            # הוספת הודעת המשתמש להיסטוריה
-            st.session_state.messages.append({
-                "role": "user", 
-                "content": user_input,
-                "time": current_time
-            })
+        # Show thinking indicator if processing
+        if st.session_state.get("thinking", False):
+            messages_html += '<div class="message assistant" style="background-color: #e8eaf6;">Analyzing food recall data...</div>'
             
-            # הגדרת מצב חשיבה
+        messages_html += '</div>'
+        chat_placeholder.markdown(messages_html, unsafe_allow_html=True)
+        
+        # Input area
+        col1, col2 = st.columns([5, 1])
+        with col1:
+            user_input = st.text_input("", placeholder="Type a message...", key="user_input", label_visibility="collapsed")
+        with col2:
+            send_button = st.button("Send", disabled=st.session_state.get("thinking", False))
+            
+        # Process user input
+        if (send_button or user_input) and user_input and not st.session_state.get("thinking", False):
+            # Add user message to chat history
+            st.session_state.messages.append({"role": "user", "content": user_input})
+            
+            # Set thinking state
             st.session_state.thinking = True
             
-            # מחיקת הקלט על ידי אילוץ לטעינה מחדש
+            # Clear input by forcing a rerun
+            st.experimental_set_query_params()  # This clears text inputs
             st.rerun()
-        
-        # עיבוד מצב החשיבה אם פעיל
-        if st.session_state.thinking:
-            # קבלת ההודעה האחרונה של המשתמש
+            
+        # Process thinking state
+        if st.session_state.get("thinking", False):
+            # Get the last user message
             user_message = st.session_state.messages[-1]["content"]
             
-            # פורמט היסטוריית השיחה לקלוד
+            # Format conversation history for Claude
             claude_messages = [
                 {"role": msg["role"], "content": msg["content"]} 
                 for msg in st.session_state.messages
             ]
             
-            # הכנת הפרומפט המערכתי
+            # Prepare system prompt
             system_prompt = f"""
             You are Contamio, a specialized food safety assistant focused on analyzing food recall data and identifying potential risks.
 
@@ -896,46 +748,35 @@ def main():
             If the user writes in Hebrew, reply in Hebrew. Otherwise, reply in English.
             """
             
-            # שאילתה לקלוד עם הפרומפט המשופר
+            # Query Claude with enhanced prompt
             response = query_claude(user_message, claude_messages[-10:], system_prompt)
             
-            # קבלת הזמן הנוכחי לתגובה
-            current_time = datetime.now().strftime("%H:%M")
-            
-            # הוספת התגובה להיסטוריית ההודעות
+            # Add response to message history
             st.session_state.messages.append({
                 "role": "assistant",
-                "content": response,
-                "time": current_time
+                "content": response
             })
             
-            # כיבוי מצב חשיבה
+            # Turn off thinking state
             st.session_state.thinking = False
             
-            # טעינה מחדש לעדכון ממשק המשתמש
+            # Rerun to update the UI
             st.rerun()
             
-        # הוספת JavaScript לגלילה אוטומטית לתחתית הצ'אט
+        # Add JavaScript to scroll chat to bottom
         st.markdown("""
         <script>
-            // פונקציה לגלילה לתחתית הצ'אט
             function scrollChatToBottom() {
-                const chatContainer = document.querySelector('.chat-container');
-                if (chatContainer) {
-                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                const chatArea = document.querySelector('.chat-area');
+                if (chatArea) {
+                    chatArea.scrollTop = chatArea.scrollHeight;
                 }
             }
-            
-            // הפעלת הפונקציה בטעינת הדף
             window.addEventListener('load', scrollChatToBottom);
-            
-            // הפעלת הפונקציה גם בכל שינוי בתוכן
             const observer = new MutationObserver(scrollChatToBottom);
-            
-            // התחלת מעקב אחר מיכל הצ'אט
-            const chatContainer = document.querySelector('.chat-container');
-            if (chatContainer) {
-                observer.observe(chatContainer, { childList: true, subtree: true });
+            const chatArea = document.querySelector('.chat-area');
+            if (chatArea) {
+                observer.observe(chatArea, { childList: true, subtree: true });
             }
         </script>
         """, unsafe_allow_html=True)
