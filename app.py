@@ -85,7 +85,7 @@ st.markdown("""
 # Function to display the Contamio logo
 def display_logo():
     logo_svg = """
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="60" height="60">
         <circle cx="200" cy="150" r="120" fill="none"/>
         <circle cx="200" cy="150" r="20" fill="#00a3e0"/>
         <circle cx="120" cy="150" r="15" fill="#00a3e0"/>
@@ -106,10 +106,17 @@ def display_logo():
         <circle cx="300" cy="190" r="6" fill="#00a3e0"/>
     </svg>
     """
-    st.markdown(f'<div style="text-align: center; margin-bottom: 1rem; width: 100%;">{logo_svg}</div>', unsafe_allow_html=True)
-    st.markdown('<h1 class="main-header">Contamio</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Food Recall Analysis Platform</p>', unsafe_allow_html=True)
-
+    
+    # Create a header with logo and text side by side
+    st.markdown(f'''
+    <div style="display: flex; align-items: center; margin-bottom: 1rem;">
+        <div>{logo_svg}</div>
+        <div style="margin-left: 15px;">
+            <h1 style="color: #00a3e0; margin-bottom: 0; font-size: 2.2rem;">Contamio</h1>
+            <p style="color: #555; margin-top: 0;">Food Recall Analysis Platform</p>
+        </div>
+    </div>
+    ''', unsafe_allow_html=True)
 # Function to load the data
 @st.cache_data
 def load_data():
