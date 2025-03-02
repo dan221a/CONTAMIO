@@ -141,8 +141,9 @@ def load_data():
     except Exception as e:
         st.error(f"Error loading Excel file: {str(e)}")
         return pd.DataFrame()
-
-def query_claude(prompt, conversation_history=None):
+        
+# query_claude
+def query_claude(prompt, conversation_history=None, system_prompt=None):
     try:
         # Get API key from secrets
         if "CLAUDE_API_KEY" in st.secrets:
@@ -170,10 +171,15 @@ def query_claude(prompt, conversation_history=None):
         # Prepare request body
         request_body = {
             "model": "claude-3-opus-20240229",
-            "max_tokens": 1024,
-            "system": "You are Contamio, a food safety analysis assistant focused on analyzing food recall data in the USA. Provide clear, concise insights about food recall trends, patterns, and potential consumer risks.",
+            "max_tokens": 1500,  # Increased for more flexible response length
             "messages": messages
         }
+        
+        # Add system prompt if provided
+        if system_prompt:
+            request_body["system"] = system_prompt
+        else:
+            request_body["system"] = "You are Contamio, a food safety analysis assistant focused on analyzing food recall data in the USA."
         
         # Make direct API call using requests
         import requests
@@ -600,62 +606,92 @@ def main():
         # Initialize chat history if it doesn't exist
         if "chat_history" not in st.session_state:
             st.session_state.chat_history = []
+    
+        # Display initial message if chat is empty
+        if not st.session_state.chat_history:
+            with st.chat_message("assistant"):
+                st.markdown("""
+                Hello! I'm Contamio, your food safety assistant. I can help you understand food recall data and identify potential risks.
+            
+                You can ask me questions like:
+                - What are the most common reasons for dairy product recalls?
+                - Are there seasonal patterns in E. coli contamination?
+                - What food categories have the highest recall rates?
+                - What should I know about allergen-related recalls?
+            
+                I'll analyze the data to help you understand food safety risks and trends.
+                """)
         
+            # Add this welcome message to history
+            st.session_state.chat_history.append({
+                "role": "assistant", 
+                "content": "Hello! I'm Contamio, your food safety assistant. I can help you understand food recall data and identify potential risks."
+            })
+    
         # Display chat messages
         for message in st.session_state.chat_history:
-            with st.container():
-                st.markdown(
-                    f"""
-                    <div class="chat-message {message['role']}">
-                        <div class="message-content">{message['content']}</div>
-                        <div class="message-time">{message['time']}</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-        
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+    
         # Chat input
-        with st.form(key="chat_form", clear_on_submit=True):
-            user_input = st.text_input("Ask about food recalls:", key="user_question")
-            submit_button = st.form_submit_button("Send")
+        user_input = st.chat_input("Ask about food recalls...")
+    
+        if user_input:
+            # Add user message to chat history
+            st.session_state.chat_history.append({"role": "user", "content": user_input})
         
-        if submit_button and user_input:
-            # Add user message to chat
-            current_time = datetime.now().strftime("%I:%M %p")
-            st.session_state.chat_history.append({
-                "role": "user",
-                "content": user_input,
-                "time": current_time
-            })
+            # Display user message immediately
+            with st.chat_message("user"):
+                st.markdown(user_input)
             
-            # Format conversation history for Claude
-            claude_messages = [
-                {"role": msg["role"], "content": msg["content"]} 
-                for msg in st.session_state.chat_history
-                if msg["role"] in ["user", "assistant"]
-            ]
+            # Show "thinking" message
+            with st.chat_message("assistant"):
+                thinking_placeholder = st.empty()
+                thinking_placeholder.markdown("_Analyzing food recall data..._")
             
-            # Prepare context about the data
-            data_context = f"""
-            You have access to a food recall database with {len(df)} records.
-            Top food categories: {', '.join(df['Food Category'].value_counts().head(5).index.tolist())}
-            Common recall reasons: {', '.join(df['Reason for Recall'].value_counts().head(5).index.tolist())}
+                # Format conversation history for Claude
+                claude_messages = [
+                    {"role": msg["role"], "content": msg["content"]} 
+                    for msg in st.session_state.chat_history
+                    if msg["role"] in ["user", "assistant"]
+                ]
             
-            The user's question is about food recalls. If you don't have specific information about a particular recall, acknowledge that and provide general information about similar recalls or food safety guidelines.
-            """
+                # Prepare enhanced system prompt for Claude
+                system_prompt = f"""
+                You are Contamio, a specialized food safety assistant focused on analyzing food recall data and identifying potential risks.
+
+                IMPORTANT GUIDELINES:
+                1. Focus on helping the user understand specific food safety risks based on the recall database.
+                2. Adjust your response length based on the complexity of the query - be concise for simple questions, more thorough for complex ones.
+                3. When appropriate, ask clarifying questions to better understand the user's specific concerns.
+                4. Include relevant statistics from the recall database to support your insights.
+                5. Prioritize practical information about food safety risks, prevention, and patterns in recalls.
+                6. Break down complex information into clear, structured explanations.
+                7. When relevant, explain the implications of recall patterns for consumers.
+
+                DATABASE CONTEXT:
+                - You have access to a food recall database with {len(df)} records.
+                - The database includes information about product types, companies, recall reasons, and dates.
+                - Top food categories: {', '.join(df['Food Category'].value_counts().head(5).index.tolist())}
+                - Common recall reasons: {', '.join(df['Recall Category'].value_counts().head(5).index.tolist())}
+                - Years covered: {df['Year'].min()} to {df['Year'].max()}
             
-            # Query Claude
-            response = query_claude(data_context + "\n\n" + user_input, claude_messages[:-1])
+                SPECIAL INSTRUCTIONS:
+                - If the user's question relates to a specific food category, provide targeted statistics about recalls in that category.
+                - If the user asks about trends, analyze temporal patterns in the data.
+                - If the user asks about risks, focus on the most common and severe contamination issues.
+                - If the user's question is too broad, ask a follow-up question to narrow the focus.
+                - Always explain the practical implications for food safety.
+                """
             
-            # Add assistant response to chat
-            st.session_state.chat_history.append({
-                "role": "assistant",
-                "content": response,
-                "time": datetime.now().strftime("%I:%M %p")
-            })
+                # Query Claude with enhanced prompt
+                response = query_claude(user_input, claude_messages[-10:], system_prompt)
             
-            # Rerun to show the updated chat
-            st.rerun()
+                # Replace thinking message with actual response
+                thinking_placeholder.markdown(response)
+        
+            # Add assistant response to chat history
+            st.session_state.chat_history.append({"role": "assistant", "content": response})
     
     # Insights Tab
     with tabs[2]:
