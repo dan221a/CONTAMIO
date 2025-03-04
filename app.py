@@ -840,19 +840,19 @@ def main():
               """
             
             # Query Claude with enhanced prompt
-            response = query_claude(user_message, claude_messages[-10:], system_prompt)
+        response = query_claude(user_message, claude_messages[-10:], system_prompt)
             
             # Add response to message history
-            st.session_state.messages.append({
+        st.session_state.messages.append({
                 "role": "assistant",
                 "content": response
             })
             
             # Turn off thinking state
-            st.session_state.thinking = False
+         st.session_state.thinking = False
             
             # Rerun to update the UI
-            st.rerun()
+         st.rerun()
             
         # Add JavaScript to scroll chat to bottom
         st.markdown("""
