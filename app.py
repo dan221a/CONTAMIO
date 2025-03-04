@@ -793,7 +793,7 @@ def main():
         monthly_risks_str = ", ".join([f"{k} ({v} cases)" for k, v in top_monthly_risks.items()]) if top_monthly_risks else "insufficient data"
 
             # Prepare system prompt
-            system_prompt = f"""
+        system_prompt = f"""
             You are Contamio, a real-time data-driven food risk analyst.
             Primary purpose: Provide concise, data-focused insights for dynamic HACCP decision-making.
             
