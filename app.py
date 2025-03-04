@@ -657,7 +657,7 @@ def main():
         # Initialize session state
         if "messages" not in st.session_state:
             st.session_state.messages = [
-                {"role": "assistant", "content": "שלום! אני קונטמיו, עוזר בטיחות המזון שלך. אני יכול לעזור לך להבין נתוני recall מזון ולזהות סיכונים פוטנציאליים.\n\nאתה יכול לשאול אותי שאלות כמו:\n\n- מהן הסיבות הנפוצות ביותר לריקול מוצרי חלב?\n- האם יש דפוסים עונתיים בזיהום E. coli?\n- אילו קטגוריות מזון יש להן את שיעורי הריקול הגבוהים ביותר?\n- מה עלי לדעת לגבי ריקולים הקשורים לאלרגנים?\n\nאני אנתח את הנתונים כדי לעזור לך להבין סיכוני בטיחות מזון ומגמות."}
+                {"role": "assistant", "content": "Hello, welcome to Contamio! We're dedicated to enhancing food safety and optimizing HACCP programs through innovative technology. How can we help you today?"}
             ]
         
         if "thinking" not in st.session_state:
