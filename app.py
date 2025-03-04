@@ -145,7 +145,34 @@ def load_data():
 # query_claude
 def query_claude(prompt, conversation_history=None, system_prompt=None):
     try:
-        # Get API key from secrets
+        # Get API key and initialize session state for token tracking if needed
+        if "total_input_tokens" not in st.session_state:
+            st.session_state.total_input_tokens = 0
+        if "total_output_tokens" not in st.session_state:
+            st.session_state.total_output_tokens = 0
+            
+        # Calculate current approximate cost (based on claude-3-7-sonnet pricing)
+        input_cost_per_million = 3.00  # $3 per million input tokens
+        output_cost_per_million = 15.00  # $15 per million output tokens
+        
+        current_cost = (st.session_state.total_input_tokens / 1000000 * input_cost_per_million) + \
+                      (st.session_state.total_output_tokens / 1000000 * output_cost_per_million)
+        
+        # Estimate tokens in current prompt (rough estimation)
+        # A better approach would be to use a proper tokenizer
+        estimated_prompt_tokens = len(prompt) / 4  # Very rough estimate
+        
+        # Check if adding this request would exceed our budget
+        max_budget_dollars = 1.00  # Maximum $1 per user session
+        
+        # Add estimated input cost
+        estimated_new_cost = current_cost + (estimated_prompt_tokens / 1000000 * input_cost_per_million)
+        
+        # If we're already over budget, return a message instead of calling API
+        if estimated_new_cost > max_budget_dollars:
+            return "You've reached the maximum usage limit for this session. Please start a new session or contact support."
+            
+        # Continue with regular API call if we're within budget
         if "CLAUDE_API_KEY" in st.secrets:
             api_key = st.secrets["CLAUDE_API_KEY"]
         elif "anthropic" in st.secrets and "CLAUDE_API_KEY" in st.secrets["anthropic"]:
@@ -165,23 +192,19 @@ def query_claude(prompt, conversation_history=None, system_prompt=None):
         if conversation_history:
             messages.extend(conversation_history)
         
-        # Add the current prompt
         messages.append({"role": "user", "content": prompt})
         
-        # Prepare request body
         request_body = {
-            "model": "claude-3-opus-20240229",
-            "max_tokens": 1500,  # Increased for more flexible response length
+            "model": "claude-3-7-sonnet-20250219",
+            "max_tokens": 1500,
             "messages": messages
         }
         
-        # Add system prompt if provided
         if system_prompt:
             request_body["system"] = system_prompt
         else:
             request_body["system"] = "You are Contamio, a food safety analysis assistant focused on analyzing food recall data in the USA."
         
-        # Make direct API call using requests
         import requests
         response = requests.post(
             "https://api.anthropic.com/v1/messages",
@@ -189,14 +212,32 @@ def query_claude(prompt, conversation_history=None, system_prompt=None):
             json=request_body
         )
         
-        # Process response
         if response.status_code == 200:
-            return response.json()["content"][0]["text"]
+            response_data = response.json()
+            
+            # Update token counters
+            if "usage" in response_data:
+                # Update input tokens
+                input_tokens = response_data["usage"].get("input_tokens", 0)
+                st.session_state.total_input_tokens += input_tokens
+                
+                # Update output tokens
+                output_tokens = response_data["usage"].get("output_tokens", 0)
+                st.session_state.total_output_tokens += output_tokens
+                
+                # Calculate and store updated cost
+                updated_cost = (st.session_state.total_input_tokens / 1000000 * input_cost_per_million) + \
+                              (st.session_state.total_output_tokens / 1000000 * output_cost_per_million)
+                st.session_state.current_session_cost = updated_cost
+                
+                # Optionally show cost to admin or log it
+                print(f"Session cost so far: ${updated_cost:.4f}")
+            
+            return response_data["content"][0]["text"]
         else:
             return f"API Error: {response.status_code} - {response.text}"
-    
     except Exception as e:
-        return f"Error: {type(e).__name__}: {str(e)}"
+        return f"Error: {str(e)}"
         
 # Function to generate food recall insights
 def generate_insights(df, aspect):
