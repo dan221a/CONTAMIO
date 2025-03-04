@@ -765,35 +765,9 @@ def main():
                 {"role": msg["role"], "content": msg["content"]} 
                 for msg in st.session_state.messages
             ]
-            # בקוד, לפני הגדרת system_prompt, הוסף:
-        current_date = datetime.now()
-        current_month = current_date.strftime("%B")
-        current_season = ""
-        month_num = current_date.month
-
-        # קביעת העונה הנוכחית
-        if 3 <= month_num <= 5:
-            current_season = "Spring"
-        elif 6 <= month_num <= 8:
-            current_season = "Summer"
-        elif 9 <= month_num <= 11:
-            current_season = "Fall"
-        else:
-            current_season = "Winter"
-
-        # חישוב נתונים עונתיים רלוונטיים
-        seasonal_df = df[df['Season'] == current_season]
-        monthly_df = df[df['Month Name'] == current_month]
-
-        top_seasonal_risks = seasonal_df['Recall Category'].value_counts().head(3).to_dict()
-        top_monthly_risks = monthly_df['Recall Category'].value_counts().head(3).to_dict() if len(monthly_df) > 0 else {}
-
-        # הכנת הנתונים לפרומפט
-        seasonal_risks_str = ", ".join([f"{k} ({v} cases)" for k, v in top_seasonal_risks.items()])
-        monthly_risks_str = ", ".join([f"{k} ({v} cases)" for k, v in top_monthly_risks.items()]) if top_monthly_risks else "insufficient data"
-
+            
             # Prepare system prompt
-        system_prompt = f"""
+            system_prompt = f"""
             You are Contamio, a real-time data-driven food risk analyst.
             Primary purpose: Provide concise, data-focused insights for dynamic HACCP decision-making.
             
@@ -803,15 +777,6 @@ def main():
             3. Integrate testing recommendations naturally within your points
             4. Focus only on actionable insights that inform immediate testing decisions
 
-
-            Current context:
-            - Today's date: {current_date.strftime("%B %d, %Y")}
-            - Current season: {current_season}
-            - Top {current_season} recall risks: {seasonal_risks_str}
-            - Top {current_month} specific risks: {monthly_risks_str}
-            - Historical seasonal pattern: {current_season} typically shows {round(len(seasonal_df) / len(df) * 100, 1)}% of annual recalls
-
-            
 
             DATABASE CONTEXT:
             - You have access to a food recall database with {len(df)} records.
@@ -840,19 +805,19 @@ def main():
               """
             
             # Query Claude with enhanced prompt
-        response = query_claude(user_message, claude_messages[-10:], system_prompt)
+            response = query_claude(user_message, claude_messages[-10:], system_prompt)
             
             # Add response to message history
-        st.session_state.messages.append({
+            st.session_state.messages.append({
                 "role": "assistant",
                 "content": response
             })
             
             # Turn off thinking state
-         st.session_state.thinking = False
+            st.session_state.thinking = False
             
             # Rerun to update the UI
-         st.rerun()
+            st.rerun()
             
         # Add JavaScript to scroll chat to bottom
         st.markdown("""
