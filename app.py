@@ -298,12 +298,16 @@ def main():
         st.sidebar.header("Filters")
     
         # Year filter
-        available_years = sorted(df["Year"].dropna().unique().tolist())
+        # Year filter (formatted like months)
+        available_years = sorted(df["Year"].dropna().astype(int).unique().tolist(), reverse=True)  # Sort in descending order
+        available_years = [str(year) for year in available_years]  # Convert to string for consistent format
+
         selected_years = st.sidebar.multiselect(
             "Select Years", 
             available_years,
             default=available_years
         )
+
     
         # Month filter (NEW)
         all_months = ["January", "February", "March", "April", "May", "June", 
